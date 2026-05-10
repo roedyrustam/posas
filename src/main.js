@@ -3,7 +3,7 @@ import './style.css';
 import Chart from 'chart.js/auto';
 import * as htmlToImage from 'html-to-image';
 import { createPaymentInvoice, checkPaymentStatus } from './payment.js';
-import { products, customers, cart, formatRupiah, addProduct, addCustomer, addTransaction, decreaseStock, addInvoice, updateInvoiceStatus, addBooking, updateBookingStatus, deleteProduct, deleteCustomer, register, login, logout, getSession, getCurrentUser, exportToCSV, transactions, canAccess, fetchTeam, upgradeToPro, bulkAddProducts, branding, updateBranding } from './data.js';
+import { products, customers, cart, formatRupiah, addProduct, addCustomer, addTransaction, decreaseStock, addInvoice, updateInvoiceStatus, addBooking, updateBookingStatus, deleteProduct, deleteCustomer, register, login, logout, getSession, getCurrentUser, exportToCSV, transactions, canAccess, fetchTeam, addStaff, removeStaff, redeemPoints, upgradeToPro, bulkAddProducts, branding, updateBranding } from './data.js';
 import {
   renderDashboard, renderPOS, renderProducts,
   renderCustomers, renderFinance, renderBooking,
@@ -11,6 +11,8 @@ import {
   renderAppearance, renderStoreProfile, renderReceiptSettings
 } from './pages.js';
 import { getWeeklyRevenue } from './data.js';
+
+let selectedPOSCustomer = null;
 
 function showUpgradeModal(featureName) {
   showModal(`
@@ -122,11 +124,11 @@ const pages = {
   finance:    { title: 'Keuangan',  render: renderFinance },
   booking:    { title: 'Booking',   render: renderBooking },
   invoices:   { title: 'Invoice',   render: renderInvoices },
-  reports:    { title: 'Laporan',   render: renderReports },
+  reports:    { title: 'Laporan',   render: renderReports, pro: true },
   settings:   { title: 'Pengaturan', render: renderSettings },
   team:       { title: 'Manajemen Tim', render: renderTeam },
-  pricing:    { title: 'Paket Berlangganan', render: renderPricing },
-  appearance: { title: 'Tampilan', render: renderAppearance },
+  pricing:    { title: 'POSAS Pro', render: renderPricing },
+  appearance: { title: 'Tampilan', render: renderAppearance, pro: true },
   storeProfile: { title: 'Profil Toko', render: renderStoreProfile },
   receiptSettings: { title: 'Struk & Nota', render: renderReceiptSettings },
 };
@@ -281,8 +283,19 @@ function handleCheckout() {
     ${items}
     <div class="flex justify-between items-center mt-16" style="padding-top:12px">
       <span class="fw-700" style="font-size:16px">Total</span>
-      <span class="fw-700" style="font-size:20px;color:var(--accent-light)">${formatRupiah(cart.total)}</span>
+      <span class="fw-700" style="font-size:20px;color:var(--accent-light)" id="checkout-total-val">${formatRupiah(cart.total)}</span>
     </div>
+
+    ${selectedPOSCustomer ? `
+    <div class="card p-12 mt-16" style="background:rgba(99,102,241,0.05); border-radius:12px">
+      <div class="flex justify-between items-center mb-8">
+        <span class="text-xs text-muted">Loyalty Poin: <strong>${selectedPOSCustomer.points || 0}</strong></span>
+        ${(selectedPOSCustomer.points || 0) >= 100 ? `
+          <button class="btn btn-xs btn-outline" id="btn-redeem-points">Tukar 100 Poin</button>
+        ` : '<span class="text-xs opacity-50">Min. 100 poin</span>'}
+      </div>
+      <div id="redemption-status" class="text-xs text-success hidden">✅ Diskon Rp 10.000 diterapkan</div>
+    </div>` : ''}
     <div class="mt-16" style="font-size:13px;color:var(--text-secondary);margin-bottom:8px">Metode Pembayaran</div>
     <div class="grid-2 gap-8 mb-16">
       <button class="btn btn-secondary pay-method active" data-method="qris">🔲 QRIS</button>
@@ -308,9 +321,25 @@ function handleCheckout() {
     const confirmBtn = document.getElementById('btn-confirm-pay');
     if (confirmBtn) confirmBtn.addEventListener('click', async () => {
       if (selectedMethod === 'qris') {
-        await handleQRISPayment(cart.total);
+        await handleQRISPayment(finalTotal);
       } else {
-        await completeTransaction('Cash');
+        await completeTransaction('Cash', finalTotal);
+      }
+    });
+
+    // Redemption logic
+    let finalTotal = cart.total;
+    const redeemBtn = document.getElementById('btn-redeem-points');
+    if (redeemBtn) redeemBtn.addEventListener('click', async () => {
+      if (!canAccess('loyalty')) return showUpgradeModal('Loyalty Points');
+      
+      const res = await redeemPoints(selectedPOSCustomer.id, 100);
+      if (res.success) {
+        finalTotal -= res.discount;
+        document.getElementById('checkout-total-val').textContent = formatRupiah(finalTotal);
+        document.getElementById('redemption-status').classList.remove('hidden');
+        redeemBtn.remove();
+        showToast('Poin berhasil ditukarkan! 🎁');
       }
     });
   }, 100);
@@ -369,15 +398,25 @@ async function handleQRISPayment(amount) {
   });
 }
 
-async function completeTransaction(paymentMethod) {
+async function completeTransaction(paymentMethod, overriddenTotal) {
   const itemLabels = cart.items.map(i => i.qty > 1 ? `${i.name} x${i.qty}` : i.name);
+  const total = overriddenTotal || cart.total;
   const txn = await addTransaction({
     items: itemLabels,
-    total: cart.total,
-    customer: 'Walk-in',
+    total: total,
+    customer: selectedPOSCustomer ? selectedPOSCustomer.name : 'Walk-in',
     paymentMethod,
     cartItems: [...cart.items]
   });
+
+  // Add points to customer (1 point per 1000)
+  if (selectedPOSCustomer) {
+    const earnedPoints = Math.floor(total / 1000);
+    selectedPOSCustomer.points = (selectedPOSCustomer.points || 0) + earnedPoints;
+    // update data.js state too (this is a bit hacky, but works for demo)
+    const cIdx = customers.findIndex(c => c.id === selectedPOSCustomer.id);
+    if (cIdx > -1) customers[cIdx].points = selectedPOSCustomer.points;
+  }
 
   // Decrease stock
   for (const item of cart.items) {
@@ -385,6 +424,7 @@ async function completeTransaction(paymentMethod) {
   }
 
   cart.clear(); // Clear cart
+  selectedPOSCustomer = null; // Reset customer
   closeModal();
   showReceiptModal(txn);
 }
@@ -405,6 +445,51 @@ function bindPageEvents(page) {
           setTimeout(() => { el.style.borderColor = ''; el.style.boxShadow = ''; }, 300);
           showToast(`${p.emoji} ${p.name} ditambahkan`);
         }
+      });
+    });
+
+    // Customer Selector
+    const customerSelectBtn = document.getElementById('pos-select-customer');
+    if (customerSelectBtn) customerSelectBtn.addEventListener('click', () => {
+      const customerListHtml = customers.map(c => `
+        <div class="list-item pos-cust-item" data-id="${c.id}" style="cursor:pointer">
+          <div class="list-avatar" style="background:${hashColor(c.name)};color:#fff">${getInitials(c.name)}</div>
+          <div class="list-content">
+            <div class="list-title">${c.name}</div>
+            <div class="list-subtitle">${c.phone} · ${c.points || 0} pts</div>
+          </div>
+          ${selectedPOSCustomer && selectedPOSCustomer.id === c.id ? '<span class="material-icons-round text-accent">check_circle</span>' : ''}
+        </div>
+      `).join('');
+
+      showModal(`
+        <div class="p-16">
+          <h3 class="fw-700 mb-16">Pilih Pelanggan</h3>
+          <div class="card mb-12 p-12 pos-cust-item" data-id="walkin" style="cursor:pointer; border-color:var(--accent)">
+            <div class="flex items-center gap-12">
+              <span class="material-icons-round text-muted">person_off</span>
+              <div class="fw-600">Walk-in Customer</div>
+            </div>
+          </div>
+          <div class="grid-1 gap-4" style="max-height:300px; overflow-y:auto">
+            ${customerListHtml}
+          </div>
+        </div>
+      `);
+
+      document.querySelectorAll('.pos-cust-item').forEach(el => {
+        el.addEventListener('click', () => {
+          const id = el.dataset.id;
+          if (id === 'walkin') {
+            selectedPOSCustomer = null;
+            document.getElementById('pos-customer-name').textContent = 'Walk-in Customer';
+          } else {
+            selectedPOSCustomer = customers.find(c => c.id === id);
+            document.getElementById('pos-customer-name').textContent = selectedPOSCustomer.name;
+          }
+          closeModal();
+          showToast('Pelanggan terpilih');
+        });
       });
     });
 
@@ -564,6 +649,17 @@ function bindPageEvents(page) {
   document.querySelectorAll('.section-link[data-page]').forEach(link => {
     link.addEventListener('click', () => navigateTo(link.dataset.page));
   });
+
+  if (page === 'reports') {
+    const exportBtn = document.getElementById('btn-export-sales');
+    if (exportBtn) {
+      exportBtn.addEventListener('click', () => {
+        const csv = generateSalesCSV();
+        downloadCSV(csv, `sales-report-${new Date().toISOString().slice(0,10)}.csv`);
+        showToast('Laporan penjualan berhasil diekspor 📂');
+      });
+    }
+  }
 
   // === Booking events ===
   if (page === 'booking') {
@@ -939,6 +1035,62 @@ function bindPageEvents(page) {
       await updateBranding({ receiptHeader, receiptFooter });
       showToast('Template struk berhasil disimpan 🧾');
       navigateTo('settings');
+    });
+  }
+  if (page === 'team') {
+    const inviteBtn = document.getElementById('btn-invite-staff');
+    if (inviteBtn) inviteBtn.addEventListener('click', () => {
+      if (!canAccess('team')) return showUpgradeModal('Manajemen Tim');
+      
+      showModal(`
+        <div class="p-20">
+          <h3 class="fw-700 mb-16">Tambah Staf Baru</h3>
+          <div class="input-group">
+            <label class="input-label">Nama Lengkap</label>
+            <input class="input" id="inp-staff-name" placeholder="Nama staf" />
+          </div>
+          <div class="input-group">
+            <label class="input-label">Email / Username</label>
+            <input class="input" id="inp-staff-email" placeholder="email@toko.com" />
+          </div>
+          <div class="input-group">
+            <label class="input-label">Hak Akses</label>
+            <select class="input" id="inp-staff-role">
+              <option value="Kasir">Kasir (Terbatas)</option>
+              <option value="Manajer">Manajer (Penuh)</option>
+            </select>
+          </div>
+          <div class="flex gap-12 mt-24">
+            <button class="btn btn-ghost flex-1" onclick="closeModal()">Batal</button>
+            <button class="btn btn-primary flex-1" id="btn-confirm-add-staff">Simpan</button>
+          </div>
+        </div>
+      `);
+
+      document.getElementById('btn-confirm-add-staff').addEventListener('click', async () => {
+        const name = document.getElementById('inp-staff-name').value.trim();
+        const email = document.getElementById('inp-staff-email').value.trim();
+        const role = document.getElementById('inp-staff-role').value;
+
+        if (!name || !email) return showToast('Harap isi semua field', 'error');
+
+        await addStaff({ name, email, role });
+        showToast(`Staf ${name} berhasil ditambahkan! ✅`);
+        closeModal();
+        navigateTo('team');
+      });
+    });
+
+    document.querySelectorAll('.btn-remove-staff').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.id;
+        const confirm = window.confirm('Hapus staf ini?');
+        if (confirm) {
+          await removeStaff(id);
+          showToast('Staf telah dihapus');
+          navigateTo('team');
+        }
+      });
     });
   }
 

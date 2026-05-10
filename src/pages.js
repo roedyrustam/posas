@@ -1,5 +1,5 @@
 // ========== POSAS Page Renderers ==========
-import { products, customers, transactions, invoices, bookings, getWeeklyRevenue, getStats, cart, formatRupiah, getInitials, hashColor, getCurrentUser, branding, getLowStockProducts } from './data.js';
+import { products, customers, transactions, invoices, bookings, staff, getWeeklyRevenue, getStats, cart, formatRupiah, getInitials, hashColor, getCurrentUser, branding, getLowStockProducts, getTopProducts, getTopCustomers, generateSalesCSV, downloadCSV } from './data.js';
 
 // ===== DASHBOARD =====
 export function renderDashboard() {
@@ -91,22 +91,28 @@ export function renderDashboard() {
     <div class="section">
       <div class="section-header">
         <span class="section-title">Produk Terlaris</span>
-        <button class="section-link" data-page="products">Lihat Semua</button>
+        <button class="section-link" data-page="reports">Detail Analisis</button>
       </div>
       <div class="card" style="padding:4px 16px">
-        ${products.slice(0, 3).map((p, i) => `
-          <div class="list-item">
-            <div style="font-size:28px">${p.emoji}</div>
-            <div class="list-content">
-              <div class="list-title">${p.name}</div>
-              <div class="list-subtitle">${p.category} · Stok: ${p.stock}</div>
-            </div>
-            <div class="list-trailing">
-              <div class="list-amount">${formatRupiah(p.price)}</div>
-              <div class="list-meta">#${i + 1}</div>
-            </div>
+        ${getTopProducts(3).length > 0 ? getTopProducts(3).map((p, i) => {
+          const product = products.find(pr => pr.name === p.name) || { emoji: '📦', price: 0 };
+          return `
+            <div class="list-item">
+              <div style="font-size:24px">${product.emoji}</div>
+              <div class="list-content ml-8">
+                <div class="list-title">${p.name}</div>
+                <div class="list-subtitle">${formatRupiah(product.price)}</div>
+              </div>
+              <div class="list-trailing">
+                <div class="list-amount">${p.count}</div>
+                <div class="list-meta">Terjual</div>
+              </div>
+            </div>`;
+        }).join('') : `
+          <div class="py-20 text-center opacity-40">
+            <p class="text-xs">Belum ada data penjualan</p>
           </div>
-        `).join('')}
+        `}
       </div>
     </div>
   </div>`;
@@ -119,6 +125,19 @@ export function renderPOS() {
     <div class="search-bar">
       <span class="material-icons-round">search</span>
       <input type="text" placeholder="Cari produk..." id="pos-search" />
+    </div>
+
+    <div class="card mb-16 p-12 flex items-center justify-between" style="border-radius:12px; cursor:pointer" id="pos-select-customer">
+      <div class="flex items-center gap-12">
+        <div class="flex-center" style="background:var(--bg-elevated); width:32px; height:32px; border-radius:8px">
+          <span class="material-icons-round" style="font-size:18px; color:var(--accent)">person</span>
+        </div>
+        <div>
+          <div class="text-xs text-muted">Pelanggan</div>
+          <div class="fw-700 text-sm" id="pos-customer-name">Walk-in Customer</div>
+        </div>
+      </div>
+      <span class="material-icons-round text-muted">chevron_right</span>
     </div>
 
     <div class="flex gap-8 mb-16" style="overflow-x:auto;padding-bottom:4px">
@@ -614,6 +633,28 @@ export function renderSettings() {
   </div>`;
 }
 
+function renderStaffItem(s) {
+  const isOwner = s.role === 'Owner';
+  return `
+  <div class="card p-12 flex items-center justify-between mb-8" style="border-radius:12px">
+    <div class="flex items-center gap-12">
+      <div class="list-avatar" style="background:${hashColor(s.name)};color:#fff">${getInitials(s.name)}</div>
+      <div>
+        <div class="fw-700 text-sm">${s.name} ${isOwner ? '<span class="badge badge-primary ml-4" style="font-size:10px;padding:2px 6px">YOU</span>' : ''}</div>
+        <div class="text-xs text-muted">${s.role} · ${s.email}</div>
+      </div>
+    </div>
+    <div class="flex items-center gap-8">
+      <div class="text-xs ${s.status === 'Active' ? 'text-success' : 'text-muted'} fw-600">${s.status}</div>
+      ${!isOwner ? `
+        <button class="icon-btn btn-remove-staff" data-id="${s.id}" style="color:var(--danger); opacity:0.6">
+          <span class="material-icons-round" style="font-size:20px">delete</span>
+        </button>
+      ` : ''}
+    </div>
+  </div>`;
+}
+
 export function renderTeam() {
   const user = getSession();
   return `
@@ -629,10 +670,14 @@ export function renderTeam() {
       </button>
     </div>
 
-    <div class="grid-1 gap-12" id="team-list">
-      <div class="flex items-center justify-center p-40">
-        <span class="material-icons-round spin" style="font-size:32px;color:var(--accent)">sync</span>
-      </div>
+    <div class="grid-1 gap-4" id="team-list">
+      ${staff.map(s => renderStaffItem(s)).join('')}
+      ${staff.length === 0 ? `
+        <div class="text-center py-40 opacity-40">
+          <span class="material-icons-round" style="font-size:48px">group_off</span>
+          <p class="text-sm">Belum ada staf terdaftar</p>
+        </div>
+      ` : ''}
     </div>
 
     <div class="card mt-24" style="background:rgba(99,102,241,0.05);border-color:rgba(99,102,241,0.2)">
@@ -817,5 +862,110 @@ export function renderReceiptSettings() {
     <button class="btn btn-primary btn-block" id="btn-save-receipt">
       Simpan Pengaturan
     </button>
+  </div>`;
+}
+
+// ===== REPORTS =====
+export function renderReports() {
+  const user = getCurrentUser() || { plan: 'free' };
+  const isPro = user.plan === 'pro';
+  const topProducts = getTopProducts(5);
+  const topCustomers = getTopCustomers(5);
+
+  return `
+  <div class="fade-in">
+    <div class="flex items-center justify-between mb-24">
+      <h2 class="fw-700">Analisis Bisnis</h2>
+      <button class="btn btn-sm btn-outline flex items-center gap-8" id="btn-export-sales" ${isPro ? '' : 'disabled'}>
+        <span class="material-icons-round" style="font-size:18px">download</span>
+        Ekspor CSV
+      </button>
+    </div>
+
+    <div class="section mb-24">
+      <div class="section-header">
+        <span class="section-title">Tren Penjualan 7 Hari</span>
+        ${isPro ? '' : '<span class="badge badge-warning">PRO</span>'}
+      </div>
+      <div class="card p-12" style="height:200px">
+        ${isPro ? '<canvas id="mainSalesChart"></canvas>' : `
+          <div class="flex-center flex-col h-full opacity-40">
+            <span class="material-icons-round mb-8" style="font-size:32px">show_chart</span>
+            <p class="text-xs">Upgrade Pro untuk melihat grafik</p>
+          </div>
+        `}
+      </div>
+    </div>
+
+    ${!isPro ? `
+    <div class="card mb-24 p-20 text-center" style="background:linear-gradient(135deg, var(--accent), var(--accent-light)); color:white">
+      <span class="material-icons-round mb-12" style="font-size:40px">insights</span>
+      <h3 class="fw-700 mb-8">Buka Analisis Mendalam</h3>
+      <p class="text-sm opacity-80 mb-16">Dapatkan insight produk terlaris dan pelanggan VIP Anda dengan POSAS Pro.</p>
+      <button class="btn btn-white btn-sm" onclick="navigateTo('pricing')">Lihat Paket Pro</button>
+    </div>` : ''}
+
+    <div class="grid-1 gap-24">
+      <div class="section">
+        <div class="section-header">
+          <span class="section-title">Produk Terlaris</span>
+          ${isPro ? '' : '<span class="badge badge-warning">PRO</span>'}
+        </div>
+        <div class="card p-16">
+          ${isPro && topProducts.length > 0 ? `
+            <div class="space-y-16">
+              ${topProducts.map(p => {
+                const percentage = (p.count / topProducts[0].count) * 100;
+                return `
+                <div class="mb-12">
+                  <div class="flex justify-between text-sm mb-4">
+                    <span class="fw-600">${p.name}</span>
+                    <span class="text-muted">${p.count} terjual</span>
+                  </div>
+                  <div style="height:8px; background:var(--bg-light); border-radius:4px; overflow:hidden">
+                    <div style="height:100%; width:${percentage}%; background:var(--accent); border-radius:4px"></div>
+                  </div>
+                </div>`;
+              }).join('')}
+            </div>
+          ` : `
+            <div class="text-center py-20 opacity-40">
+              <span class="material-icons-round" style="font-size:48px">bar_chart</span>
+              <p class="text-sm">${topProducts.length === 0 ? 'Belum ada data transaksi' : 'Data hanya tersedia untuk pengguna Pro'}</p>
+            </div>
+          `}
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          <span class="section-title">Pelanggan VIP (Revenue Terbesar)</span>
+          ${isPro ? '' : '<span class="badge badge-warning">PRO</span>'}
+        </div>
+        <div class="card" style="padding:4px 16px">
+          ${isPro ? `
+            ${topCustomers.map((c, i) => `
+              <div class="list-item">
+                <div class="flex-center fw-700 text-muted" style="width:24px; font-size:14px">#${i+1}</div>
+                <div class="list-avatar ml-8" style="background:${hashColor(c.name)};color:#fff">${getInitials(c.name)}</div>
+                <div class="list-content">
+                  <div class="list-title">${c.name}</div>
+                  <div class="list-subtitle">${c.visits} kunjungan</div>
+                </div>
+                <div class="list-trailing">
+                  <div class="list-amount" style="color:var(--accent)">${formatRupiah(c.totalSpent)}</div>
+                  <div class="list-meta">Total Belanja</div>
+                </div>
+              </div>
+            `).join('')}
+          ` : `
+            <div class="text-center py-20 opacity-40">
+              <span class="material-icons-round" style="font-size:48px">group</span>
+              <p class="text-sm">Data hanya tersedia untuk pengguna Pro</p>
+            </div>
+          `}
+        </div>
+      </div>
+    </div>
   </div>`;
 }

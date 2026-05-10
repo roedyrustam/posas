@@ -11,6 +11,7 @@ const KEYS = {
   users: 'posas_users',
   session: 'posas_session',
   branding: 'posas_branding',
+  staff: 'posas_staff',
 };
 
 function loadJSON(key, fallback) {
@@ -63,6 +64,11 @@ const DEFAULT_TRANSACTIONS = [
   { id: 't5', date: '2026-05-09 19:20', items: ['Mie Ayam x2', 'Es Teh Manis x2'], total: 56000, customer: 'Siti Rahayu', method: 'Tunai' },
   { id: 't6', date: '2026-05-09 16:30', items: ['Brownies x4', 'Kopi Susu'], total: 66000, customer: 'Walk-in', method: 'QRIS' },
 ];
+const DEFAULT_STAFF = [
+  { id: 's1', name: 'Roedy Santosa', email: 'roedy@posas.id', role: 'Owner', status: 'Active' },
+  { id: 's2', name: 'Bambang Kasir', email: 'bambang@gmail.com', role: 'Kasir', status: 'Active' },
+  { id: 's3', name: 'Maya Manager', email: 'maya@posas.id', role: 'Manajer', status: 'Active' },
+];
 
 // --- Load from localStorage (or seed defaults) ---
 export let products = loadJSON(KEYS.products, DEFAULT_PRODUCTS);
@@ -70,6 +76,7 @@ export let customers = loadJSON(KEYS.customers, DEFAULT_CUSTOMERS);
 export let transactions = loadJSON(KEYS.transactions, DEFAULT_TRANSACTIONS);
 export let invoices = loadJSON(KEYS.invoices, []);
 export let bookings = loadJSON(KEYS.bookings, []);
+export let staff = loadJSON(KEYS.staff, DEFAULT_STAFF);
 
 // --- Branding (Appearance & Store Info) ---
 const DEFAULT_BRANDING = {
@@ -238,14 +245,15 @@ export async function addTransaction({ items, total, customer, method, cartItems
     id: crypto.randomUUID(),
     user_id: user.id,
     created_at: now.toISOString(),
-    items: JSON.stringify(items), // items as JSON string for storage
+    items: JSON.stringify(items), 
     total: Number(total),
     customer_name: customer || 'Walk-in',
     method: method || 'Tunai',
+    raw_items: cartItems // For deep reporting
   };
 
   // For local UI consistency
-  const localTxn = { ...txn, date: dateStr, customer: txn.customer_name, items: items };
+  const localTxn = { ...txn, date: dateStr, customer: txn.customer_name, items: items, cartItems: cartItems };
   transactions.unshift(localTxn);
   saveJSON(KEYS.transactions, transactions);
 
@@ -555,16 +563,16 @@ export function canAccess(action) {
   if (!user) return false;
   
   const permissions = {
-    'owner': ['pos', 'products', 'customers', 'finance', 'reports', 'booking', 'invoices', 'settings', 'manage_staff', 'delete_data', 'appearance', 'storeProfile', 'receiptSettings'],
+    'owner': ['pos', 'products', 'customers', 'finance', 'reports', 'booking', 'invoices', 'settings', 'manage_staff', 'delete_data', 'appearance', 'storeProfile', 'receiptSettings', 'team', 'loyalty'],
     'kasir': ['pos', 'customers', 'booking', 'settings', 'appearance', 'storeProfile', 'receiptSettings'],
-    'manajer': ['pos', 'products', 'customers', 'booking', 'invoices', 'settings', 'reports', 'appearance', 'storeProfile', 'receiptSettings']
+    'manajer': ['pos', 'products', 'customers', 'booking', 'invoices', 'settings', 'reports', 'appearance', 'storeProfile', 'receiptSettings', 'loyalty']
   };
   
   const allowed = permissions[user.role.toLowerCase()] || [];
   if (!allowed.includes(action)) return false;
 
   // Plan-based restrictions
-  const proFeatures = ['reports', 'manage_staff', 'delete_data', 'appearance', 'storeProfile', 'receiptSettings'];
+  const proFeatures = ['reports', 'manage_staff', 'delete_data', 'appearance', 'storeProfile', 'receiptSettings', 'team', 'loyalty'];
   if (proFeatures.includes(action) && user.plan !== 'pro') {
     return false;
   }
@@ -638,4 +646,82 @@ export function exportToCSV(filename, data) {
   document.body.removeChild(link);
 }export function getLowStockProducts() {
   return products.filter(p => (p.stock || 0) <= 10);
+}
+
+export async function redeemPoints(customerId, pointsToRedeem) {
+  const customer = customers.find(c => c.id === customerId);
+  if (!customer || customer.points < pointsToRedeem) return { success: false, message: 'Poin tidak mencukupi' };
+  
+  customer.points -= pointsToRedeem;
+  const discount = (pointsToRedeem / 100) * 10000; // 100 pts = 10k disc
+  
+  saveJSON(KEYS.customers, customers);
+  return { success: true, discount, newPoints: customer.points };
+}
+
+export function getTopProducts(limit = 5) {
+  const counts = {};
+  transactions.forEach(t => {
+    if (t.cartItems) {
+      t.cartItems.forEach(item => {
+        counts[item.name] = (counts[item.name] || 0) + item.qty;
+      });
+    } else {
+      // Fallback for old transactions
+      t.items.forEach(label => {
+        const name = label.split(' x')[0];
+        counts[name] = (counts[name] || 0) + 1;
+      });
+    }
+  });
+  return Object.entries(counts)
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, limit);
+}
+
+export function getTopCustomers(limit = 5) {
+  return [...customers]
+    .sort((a, b) => b.totalSpent - a.totalSpent)
+    .slice(0, limit);
+}
+
+export function generateSalesCSV() {
+  const headers = ['ID', 'Pelanggan', 'Tanggal', 'Metode', 'Item', 'Total'];
+  const rows = transactions.map(t => [
+    t.id,
+    t.customer,
+    t.date,
+    t.method,
+    `"${t.items.join(';')}"`,
+    t.total
+  ]);
+  return [headers, ...rows].map(r => r.join(',')).join('\n');
+}
+
+// --- Staff Management ---
+export async function fetchTeam() {
+  // Simulate network delay
+  return new Promise(resolve => setTimeout(() => resolve(staff), 500));
+}
+
+export async function addStaff(data) {
+  const newStaff = {
+    id: 's' + Date.now(),
+    status: 'Active',
+    ...data
+  };
+  staff.push(newStaff);
+  saveJSON(KEYS.staff, staff);
+  return newStaff;
+}
+
+export async function removeStaff(id) {
+  const idx = staff.findIndex(s => s.id === id);
+  if (idx > -1) {
+    staff.splice(idx, 1);
+    saveJSON(KEYS.staff, staff);
+    return true;
+  }
+  return false;
 }
