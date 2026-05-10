@@ -554,9 +554,9 @@ export function canAccess(action) {
   if (!user) return false;
   
   const permissions = {
-    'owner': ['pos', 'products', 'customers', 'finance', 'reports', 'booking', 'invoices', 'settings', 'manage_staff', 'delete_data'],
-    'kasir': ['pos', 'customers', 'booking', 'settings'],
-    'manajer': ['pos', 'products', 'customers', 'booking', 'invoices', 'settings', 'reports']
+    'owner': ['pos', 'products', 'customers', 'finance', 'reports', 'booking', 'invoices', 'settings', 'manage_staff', 'delete_data', 'appearance', 'storeProfile', 'receiptSettings'],
+    'kasir': ['pos', 'customers', 'booking', 'settings', 'appearance', 'storeProfile', 'receiptSettings'],
+    'manajer': ['pos', 'products', 'customers', 'booking', 'invoices', 'settings', 'reports', 'appearance', 'storeProfile', 'receiptSettings']
   };
   
   const allowed = permissions[user.role.toLowerCase()] || [];
