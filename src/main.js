@@ -1,6 +1,6 @@
 // ========== POSAS Main App ==========
 import './style.css';
-import { products, customers, cart, formatRupiah, addProduct, addCustomer, addTransaction, decreaseStock, addInvoice, updateInvoiceStatus, addBooking, updateBookingStatus, deleteProduct, deleteCustomer, register, login, logout, getSession, getCurrentUser } from './data.js';
+import { products, customers, cart, formatRupiah, addProduct, addCustomer, addTransaction, decreaseStock, addInvoice, updateInvoiceStatus, addBooking, updateBookingStatus, deleteProduct, deleteCustomer, register, login, logout, getSession, getCurrentUser, exportToCSV, transactions } from './data.js';
 import {
   renderDashboard, renderPOS, renderProducts,
   renderCustomers, renderFinance, renderBooking,
@@ -167,19 +167,20 @@ function handleCheckout() {
       confirmBtn.innerHTML = '<span class="material-icons-round spin">sync</span> Memproses...';
       
       // Persist transaction
-      const itemLabels = cart.items.map(i => i.qty > 1 ? `${i.name} x${i.qty}` : i.name);
-      await addTransaction({
+      const txn = {
         items: itemLabels,
         total: cart.total,
         customer: 'Walk-in',
         method: selectedMethod,
-        cartItems: cart.items
-      });
+        cartItems: cart.items,
+        date: new Date().toLocaleString('id-ID')
+      };
+      await addTransaction(txn);
       
       cart.clear();
       closeModal();
-      showToast('Pembayaran berhasil! 🎉');
-      navigateTo('pos');
+      showReceiptModal(txn);
+    });
     });
   }, 100);
 }
@@ -480,10 +481,64 @@ function bindPageEvents(page) {
     });
   }
 
+  if (page === 'reports') {
+    const exportBtn = document.getElementById('btn-export-csv');
+    if (exportBtn) exportBtn.addEventListener('click', () => {
+      exportToCSV('transaksi_posas.csv', transactions);
+      showToast('Data berhasil diekspor 📂');
+    });
+  }
+
   if (page === 'settings') {
     const logoutBtn = document.getElementById('btn-logout');
     if (logoutBtn) logoutBtn.addEventListener('click', handleLogout);
   }
+}
+
+// ===== Receipt Modal =====
+function showReceiptModal(txn) {
+  const user = getCurrentUser() || { storeName: 'POSAS Store' };
+  const itemsHtml = txn.cartItems ? txn.cartItems.map(i => `
+    <div class="receipt-item">
+      <span>${i.name} x${i.qty}</span>
+      <span>${formatRupiah(i.price * i.qty)}</span>
+    </div>
+  `).join('') : txn.items.map(it => `<div class="receipt-item"><span>${it}</span></div>`).join('');
+
+  showModal('Transaksi Berhasil', `
+    <div class="receipt">
+      <div class="receipt-header">
+        <div class="receipt-store">${user.storeName}</div>
+        <div class="receipt-info">${txn.date}</div>
+        <div class="receipt-info">TRX-${Math.floor(Math.random()*10000)}</div>
+      </div>
+      <div class="receipt-items">
+        ${itemsHtml}
+      </div>
+      <div class="receipt-total">
+        <span>TOTAL</span>
+        <span>${formatRupiah(txn.total)}</span>
+      </div>
+      <div class="receipt-footer">
+        <div class="receipt-qr">QR RECEIPT</div>
+        <p>Terima kasih atas kunjungan Anda!</p>
+        <p>Powered by POSAS</p>
+      </div>
+    </div>
+    <div class="flex gap-12 mt-16">
+      <button class="btn btn-secondary flex-1" onclick="closeModal(); navigateTo('pos')">Tutup</button>
+      <button class="btn btn-primary flex-1" id="btn-print-receipt">
+        <span class="material-icons-round" style="font-size:18px">print</span> Cetak
+      </button>
+    </div>
+  `);
+  
+  setTimeout(() => {
+    const printBtn = document.getElementById('btn-print-receipt');
+    if (printBtn) printBtn.addEventListener('click', () => {
+      window.print();
+    });
+  }, 50);
 }
 
 // ===== Auth UI =====

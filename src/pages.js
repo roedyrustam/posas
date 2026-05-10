@@ -407,7 +407,12 @@ export function renderReports() {
     </div>
 
     <div class="section">
-      <div class="section-header"><span class="section-title">Tren Mingguan</span></div>
+      <div class="section-header">
+        <span class="section-title">Tren Mingguan</span>
+        <button class="btn btn-sm btn-secondary" id="btn-export-csv" style="padding: 6px 12px; font-size: 11px;">
+          <span class="material-icons-round" style="font-size:14px">download</span> Export CSV
+        </button>
+      </div>
       <div class="card">
         <div class="chart-bar-container">${weeklyRevenue.map(d => `
           <div class="chart-bar-wrap">
