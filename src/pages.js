@@ -46,15 +46,8 @@ export function renderDashboard() {
         <span class="section-title">Pendapatan Minggu Ini</span>
         <span class="text-sm fw-700" style="color:var(--accent-light)">${formatRupiah(stats.monthRevenue)}</span>
       </div>
-      <div class="card">
-        <div class="chart-bar-container">
-          ${weeklyRevenue.map(d => `
-            <div class="chart-bar-wrap">
-              <div class="chart-bar" style="height:${(d.amount / maxRev) * 100}%"></div>
-              <span class="chart-label">${d.day}</span>
-            </div>
-          `).join('')}
-        </div>
+      <div class="card" style="padding:12px">
+        <canvas id="salesChartDashboard" height="150"></canvas>
       </div>
     </div>
 
@@ -413,13 +406,8 @@ export function renderReports() {
           <span class="material-icons-round" style="font-size:14px">download</span> Export CSV
         </button>
       </div>
-      <div class="card">
-        <div class="chart-bar-container">${weeklyRevenue.map(d => `
-          <div class="chart-bar-wrap">
-            <div class="chart-bar" style="height:${(d.amount / maxRev) * 100}%"></div>
-            <span class="chart-label">${d.day}</span>
-          </div>`).join('')}
-        </div>
+      <div class="card" style="padding:12px">
+        <canvas id="mainSalesChart" height="200"></canvas>
       </div>
     </div>
 

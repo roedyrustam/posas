@@ -1,11 +1,13 @@
 // ========== POSAS Main App ==========
 import './style.css';
+import Chart from 'chart.js/auto';
 import { products, customers, cart, formatRupiah, addProduct, addCustomer, addTransaction, decreaseStock, addInvoice, updateInvoiceStatus, addBooking, updateBookingStatus, deleteProduct, deleteCustomer, register, login, logout, getSession, getCurrentUser, exportToCSV, transactions, canAccess, fetchTeam } from './data.js';
 import {
   renderDashboard, renderPOS, renderProducts,
   renderCustomers, renderFinance, renderBooking,
   renderInvoices, renderReports, renderSettings, renderTeam
 } from './pages.js';
+import { getWeeklyRevenue } from './data.js';
 
 // Page registry
 const pages = {
@@ -531,6 +533,55 @@ function bindPageEvents(page) {
       showToast('Fitur kirim undangan staf akan segera hadir! 📧', 'info');
     });
   }
+
+  // Initialize charts for Dashboard and Reports
+  if (page === 'dashboard' || page === 'reports') {
+    setTimeout(() => initCharts(page), 50);
+  }
+}
+
+// ===== Charts Initialization =====
+function initCharts(page) {
+  const chartConfig = {
+    dashboard: { id: 'salesChartDashboard', type: 'line' },
+    reports: { id: 'mainSalesChart', type: 'bar' }
+  };
+
+  const config = chartConfig[page];
+  if (!config) return;
+
+  const canvas = document.getElementById(config.id);
+  if (!canvas) return;
+
+  const weeklyData = getWeeklyRevenue();
+  const labels = weeklyData.map(d => d.day);
+  const amounts = weeklyData.map(d => d.amount);
+
+  new Chart(canvas, {
+    type: config.type,
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Pendapatan (Rp)',
+        data: amounts,
+        backgroundColor: page === 'dashboard' ? 'rgba(99, 102, 241, 0.2)' : 'rgba(99, 102, 241, 0.8)',
+        borderColor: '#6366f1',
+        borderWidth: 2,
+        tension: 0.4,
+        fill: page === 'dashboard',
+        borderRadius: 4
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, grid: { display: false }, ticks: { display: false } },
+        x: { grid: { display: false } }
+      }
+    }
+  });
 }
 
 // ===== Receipt Modal =====

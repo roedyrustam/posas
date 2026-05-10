@@ -407,7 +407,7 @@ erDiagram
 
 - [ ] Multi-outlet support
 - [x] Team management (roles: Owner, Kasir, Manajer)
-- [ ] Advanced analytics (AI insights)
+- [x] Advanced analytics (Chart.js)
 - [ ] Subscription billing (Free → Pro → Enterprise)
 - [ ] API public untuk integrasi
 - [ ] White-label / custom branding
