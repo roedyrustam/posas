@@ -519,20 +519,30 @@ export function renderSettings() {
 
     <div class="section-title mb-8" style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px">Akun</div>
     <div class="grid-1 mb-16">
-      ${[
-        ['people', 'Tim & Akses', 'Kelola karyawan dan hak akses'],
-        ['security', 'Keamanan', 'Password dan verifikasi'],
-        ['help', 'Bantuan', 'FAQ dan dukungan'],
-      ].map(([icon, title, sub]) => `
-        <div class="card flex items-center gap-12" style="padding:14px 16px;cursor:pointer">
-          <span class="material-icons-round text-muted">${icon}</span>
-          <div class="list-content">
-            <div class="list-title">${title}</div>
-            <div class="list-subtitle">${sub}</div>
-          </div>
-          <span class="material-icons-round text-muted">chevron_right</span>
+      <div class="card flex items-center gap-12 section-link" data-page="team" style="padding:14px 16px;cursor:pointer">
+        <span class="material-icons-round text-muted">people</span>
+        <div class="list-content">
+          <div class="list-title">Tim & Akses</div>
+          <div class="list-subtitle">Kelola karyawan dan hak akses</div>
         </div>
-      `).join('')}
+        <span class="material-icons-round text-muted">chevron_right</span>
+      </div>
+      <div class="card flex items-center gap-12" style="padding:14px 16px;cursor:pointer">
+        <span class="material-icons-round text-muted">security</span>
+        <div class="list-content">
+          <div class="list-title">Keamanan</div>
+          <div class="list-subtitle">Password dan verifikasi</div>
+        </div>
+        <span class="material-icons-round text-muted">chevron_right</span>
+      </div>
+      <div class="card flex items-center gap-12" style="padding:14px 16px;cursor:pointer">
+        <span class="material-icons-round text-muted">help</span>
+        <div class="list-content">
+          <div class="list-title">Bantuan</div>
+          <div class="list-subtitle">FAQ dan dukungan</div>
+        </div>
+        <span class="material-icons-round text-muted">chevron_right</span>
+      </div>
     </div>
 
     <div class="card flex items-center gap-12 mb-16" style="padding:14px 16px;border-color:rgba(99,102,241,0.3);background:rgba(99,102,241,0.08)">
@@ -550,5 +560,42 @@ export function renderSettings() {
     </button>
 
     <p class="text-sm text-muted" style="text-align:center">POSAS v1.0.0 · Paket ${user.plan === 'free' ? 'Gratis' : 'Premium'}</p>
+  </div>`;
+}
+
+export function renderTeam() {
+  const user = getSession();
+  return `
+  <div class="p-20 fade-in">
+    <div class="flex justify-between items-center mb-20">
+      <div>
+        <h2 class="fw-700" style="font-size:20px">Tim & Akses</h2>
+        <p class="text-muted text-sm">Manajemen staf dan hak akses toko</p>
+      </div>
+      <button class="btn btn-primary btn-sm" id="btn-invite-staff">
+        <span class="material-icons-round" style="font-size:18px">person_add</span>
+        Tambah Staf
+      </button>
+    </div>
+
+    <div class="grid-1 gap-12" id="team-list">
+      <div class="flex items-center justify-center p-40">
+        <span class="material-icons-round spin" style="font-size:32px;color:var(--accent)">sync</span>
+      </div>
+    </div>
+
+    <div class="card mt-24" style="background:rgba(99,102,241,0.05);border-color:rgba(99,102,241,0.2)">
+      <div class="flex gap-12 p-16">
+        <span class="material-icons-round" style="color:var(--accent)">info</span>
+        <div>
+          <div class="fw-600 mb-4" style="font-size:14px">Tentang Hak Akses</div>
+          <ul class="text-sm text-muted" style="padding-left:16px;margin:0">
+            <li><strong>Owner</strong>: Akses penuh ke semua fitur dan data.</li>
+            <li><strong>Manajer</strong>: Akses semua kecuali hapus data & kelola staf.</li>
+            <li><strong>Kasir</strong>: Hanya akses POS, Pelanggan, dan Booking.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
   </div>`;
 }

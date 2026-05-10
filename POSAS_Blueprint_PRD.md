@@ -399,14 +399,14 @@ erDiagram
 - [ ] Notifikasi real (stok menipis, pembayaran masuk)
 - [ ] Customer loyalty program
 - [ ] Multi-payment gateway (QRIS real, GoPay, OVO)
-- [ ] PWA + Service Worker (offline-first)
-- [ ] Export data (CSV/Excel)
+- [x] PWA + Service Worker (offline-first)
+- [x] Export data (CSV/Excel)
 
 ### Phase 4 — Scale (Minggu 7+)
 > Fitur untuk **scaling bisnis**
 
 - [ ] Multi-outlet support
-- [ ] Team management (roles: Owner, Kasir, Manajer)
+- [x] Team management (roles: Owner, Kasir, Manajer)
 - [ ] Advanced analytics (AI insights)
 - [ ] Subscription billing (Free → Pro → Enterprise)
 - [ ] API public untuk integrasi

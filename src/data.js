@@ -108,6 +108,7 @@ export async function addProduct({ name, price, stock, category, emoji }) {
   const product = {
     id: crypto.randomUUID(),
     user_id: user.id,
+    tenant_id: getSession().tenantId,
     name,
     price: Number(price),
     stock: Number(stock),
@@ -150,6 +151,7 @@ export async function addCustomer({ name, phone, email }) {
   const customer = {
     id: crypto.randomUUID(),
     user_id: user.id,
+    tenant_id: getSession().tenantId,
     name,
     phone,
     email: email || '',
@@ -212,6 +214,7 @@ export async function addTransaction({ items, total, customer, method, cartItems
   await supabase.from('transactions').insert({
     id: txn.id,
     user_id: txn.user_id,
+    tenant_id: getSession().tenantId,
     items: items,
     total: txn.total,
     customer_name: txn.customer_name,
@@ -275,7 +278,7 @@ export async function addInvoice({ customer, items, total, dueDate, notes }) {
   invoices.unshift(localInv);
   saveJSON(KEYS.invoices, invoices);
 
-  await supabase.from('invoices').insert(inv);
+  await supabase.from('invoices').insert({ ...inv, tenant_id: getSession().tenantId });
   return localInv;
 }
 
@@ -319,7 +322,7 @@ export async function addBooking({ customerName, service, date, time, notes }) {
   bookings.unshift(localBk);
   saveJSON(KEYS.bookings, bookings);
 
-  await supabase.from('bookings').insert(booking);
+  await supabase.from('bookings').insert({ ...booking, tenant_id: getSession().tenantId });
   return localBk;
 }
 
@@ -454,16 +457,16 @@ export async function register({ name, email, password, storeName }) {
   if (error) return { ok: false, error: error.message };
   
   // Sesi otomatis tersimpan oleh Supabase client
-  const user = data.user;
   const session = { 
     userId: user.id, 
     name: name, 
     email: user.email, 
     storeName: storeName, 
     role: 'owner', 
-    plan: 'free' 
+    plan: 'free',
+    tenantId: profile ? profile.tenant_id : null
   };
-  saveJSON(KEYS.session, session); // Sinkronkan ke local storage juga untuk kenyamanan
+  saveJSON(KEYS.session, session);
   return { ok: true, user: session };
 }
 
@@ -487,8 +490,9 @@ export async function login({ email, password }) {
     name: profile ? profile.full_name : data.user.email, 
     email: data.user.email, 
     storeName: profile ? profile.store_name : 'Toko Saya', 
-    role: 'owner', 
-    plan: profile ? profile.plan : 'free' 
+    role: profile ? profile.role : 'owner', 
+    plan: profile ? profile.plan : 'free',
+    tenantId: profile ? profile.tenant_id : null
   };
   saveJSON(KEYS.session, session);
   return { ok: true, user: session };
@@ -506,6 +510,33 @@ export function getSession() {
 
 export function getCurrentUser() {
   return getSession();
+}
+
+export function canAccess(action) {
+  const user = getCurrentUser();
+  if (!user) return false;
+  
+  const permissions = {
+    'owner': ['pos', 'products', 'customers', 'finance', 'reports', 'booking', 'invoices', 'settings', 'manage_staff', 'delete_data'],
+    'kasir': ['pos', 'customers', 'booking', 'settings'],
+    'manajer': ['pos', 'products', 'customers', 'booking', 'invoices', 'settings', 'reports']
+  };
+  
+  const allowed = permissions[user.role.toLowerCase()] || [];
+  return allowed.includes(action);
+}
+
+export async function fetchTeam() {
+  const user = getSession();
+  if (!user || !user.tenantId) return [];
+  
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('tenant_id', user.tenantId);
+    
+  if (error) { console.error(error); return []; }
+  return data;
 }
 
 // --- Export Utility ---

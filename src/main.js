@@ -1,10 +1,10 @@
 // ========== POSAS Main App ==========
 import './style.css';
-import { products, customers, cart, formatRupiah, addProduct, addCustomer, addTransaction, decreaseStock, addInvoice, updateInvoiceStatus, addBooking, updateBookingStatus, deleteProduct, deleteCustomer, register, login, logout, getSession, getCurrentUser, exportToCSV, transactions } from './data.js';
+import { products, customers, cart, formatRupiah, addProduct, addCustomer, addTransaction, decreaseStock, addInvoice, updateInvoiceStatus, addBooking, updateBookingStatus, deleteProduct, deleteCustomer, register, login, logout, getSession, getCurrentUser, exportToCSV, transactions, canAccess, fetchTeam } from './data.js';
 import {
   renderDashboard, renderPOS, renderProducts,
   renderCustomers, renderFinance, renderBooking,
-  renderInvoices, renderReports, renderSettings
+  renderInvoices, renderReports, renderSettings, renderTeam
 } from './pages.js';
 
 // Page registry
@@ -18,6 +18,7 @@ const pages = {
   invoices:   { title: 'Invoice',   render: renderInvoices },
   reports:    { title: 'Laporan',   render: renderReports },
   settings:   { title: 'Pengaturan', render: renderSettings },
+  team:       { title: 'Manajemen Tim', render: renderTeam },
 };
 
 let currentPage = 'dashboard';
@@ -39,6 +40,10 @@ const authScreen = $('auth-screen');
 // ===== Navigation =====
 function navigateTo(page) {
   if (!pages[page]) return;
+  if (!canAccess(page) && page !== 'dashboard') {
+    showToast('Akses ditolak: Anda tidak memiliki izin untuk halaman ini ✋', 'danger');
+    return;
+  }
   currentPage = page;
 
   // Render page
@@ -167,12 +172,13 @@ function handleCheckout() {
       confirmBtn.innerHTML = '<span class="material-icons-round spin">sync</span> Memproses...';
       
       // Persist transaction
+      const itemLabels = cart.items.map(i => i.qty > 1 ? `${i.name} x${i.qty}` : i.name);
       const txn = {
         items: itemLabels,
         total: cart.total,
         customer: 'Walk-in',
         method: selectedMethod,
-        cartItems: cart.items,
+        cartItems: [...cart.items],
         date: new Date().toLocaleString('id-ID')
       };
       await addTransaction(txn);
@@ -180,7 +186,6 @@ function handleCheckout() {
       cart.clear();
       closeModal();
       showReceiptModal(txn);
-    });
     });
   }, 100);
 }
@@ -492,6 +497,39 @@ function bindPageEvents(page) {
   if (page === 'settings') {
     const logoutBtn = document.getElementById('btn-logout');
     if (logoutBtn) logoutBtn.addEventListener('click', handleLogout);
+    
+    // Bind section links in settings (manually since they are inside the rendered content)
+    document.querySelectorAll('.section-link[data-page]').forEach(link => {
+      link.addEventListener('click', () => navigateTo(link.dataset.page));
+    });
+  }
+
+  if (page === 'team') {
+    (async () => {
+      const team = await fetchTeam();
+      const list = document.getElementById('team-list');
+      if (!list) return;
+      
+      list.innerHTML = team.map(m => `
+        <div class="card flex items-center justify-between p-16">
+          <div class="flex items-center gap-12">
+            <div class="avatar-btn" style="width:40px;height:40px"><span class="avatar-text">${m.full_name.charAt(0).toUpperCase()}</span></div>
+            <div>
+              <div class="fw-600">${m.full_name}</div>
+              <div class="text-xs text-muted">${m.role.toUpperCase()}</div>
+            </div>
+          </div>
+          ${m.id !== getCurrentUser().userId ? `
+            <button class="icon-btn text-muted"><span class="material-icons-round">edit</span></button>
+          ` : '<span class="badge badge-success" style="font-size:10px">ANDA</span>'}
+        </div>
+      `).join('');
+    })();
+
+    const inviteBtn = document.getElementById('btn-invite-staff');
+    if (inviteBtn) inviteBtn.addEventListener('click', () => {
+      showToast('Fitur kirim undangan staf akan segera hadir! 📧', 'info');
+    });
   }
 }
 
@@ -676,15 +714,32 @@ function showAuthError(msg) {
 function enterApp(user) {
   authScreen.classList.add('hidden');
   shell.classList.remove('hidden');
+  
   // Update UI with user info
   if (user) {
     const initials = user.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
     document.querySelectorAll('.avatar-text').forEach(el => el.textContent = initials);
     const tenantEl = $('tenant-name');
     if (tenantEl) tenantEl.textContent = user.storeName || 'Toko Saya';
-    // Update drawer
+    
+    // Update drawer info
     const drawerName = document.querySelector('.drawer-user-name');
+    const drawerRole = document.querySelector('.drawer-user-role');
     if (drawerName) drawerName.textContent = user.name;
+    if (drawerRole) {
+      const roleMap = { 'owner': 'Pemilik Toko', 'kasir': 'Kasir', 'manajer': 'Manajer' };
+      drawerRole.textContent = roleMap[user.role.toLowerCase()] || user.role;
+    }
+
+    // RBAC: Hide restricted nav items
+    document.querySelectorAll('.nav-item, .drawer-item').forEach(el => {
+      const page = el.dataset.page;
+      if (page && page !== 'dashboard' && !canAccess(page)) {
+        el.style.display = 'none';
+      } else {
+        el.style.display = 'flex';
+      }
+    });
   }
   navigateTo('dashboard');
 }
@@ -696,6 +751,13 @@ async function handleLogout() {
 
 // ===== Init =====
 import { syncCloudData } from './data.js';
+
+// Service Worker Registration
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW registration failed:', err));
+  });
+}
 
 async function init() {
   const session = getSession();
