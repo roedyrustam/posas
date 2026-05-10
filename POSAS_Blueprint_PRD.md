@@ -358,7 +358,7 @@ erDiagram
 | Area | Gap | Priority |
 |------|-----|----------|
 | ~~**Data Persistence**~~ | ~~Semua data in-memory~~ → ✅ localStorage | ~~🔴~~ ✅ Done |
-| **Authentication** | Tidak ada login/register | 🔴 Critical |
+| ~~**Authentication**~~ | ~~Tidak ada login/register~~ → ✅ Full Auth flow | ~~🔴~~ ✅ Done |
 | **Multi-tenancy** | Tenant hardcoded, tidak ada isolasi | 🔴 Critical |
 | ~~**CRUD Operations**~~ | ~~Add product/customer tidak persist~~ → ✅ Full CRUD | ~~🟠~~ ✅ Done |
 | ~~**Form Validation**~~ | ~~Tidak ada validasi input~~ → ✅ Required fields + error msg | ~~🟠~~ ✅ Done |

@@ -8,6 +8,8 @@ const KEYS = {
   cart: 'posas_cart',
   invoices: 'posas_invoices',
   bookings: 'posas_bookings',
+  users: 'posas_users',
+  session: 'posas_session',
 };
 
 function loadJSON(key, fallback) {
@@ -335,4 +337,49 @@ export function resetAllData() {
   saveJSON(KEYS.transactions, DEFAULT_TRANSACTIONS);
   saveJSON(KEYS.cart, []);
   location.reload();
+}
+
+// ========== AUTH SYSTEM ==========
+const users = loadJSON(KEYS.users, []);
+
+export function register({ name, email, password, storeName }) {
+  if (users.find(u => u.email === email)) {
+    return { ok: false, error: 'Email sudah terdaftar' };
+  }
+  const user = {
+    id: 'u' + Date.now(),
+    name,
+    email,
+    password, // NOTE: plain text for demo only — use bcrypt+backend in production
+    storeName: storeName || 'Toko Saya',
+    role: 'owner',
+    plan: 'free',
+    createdAt: new Date().toISOString().slice(0, 10),
+  };
+  users.push(user);
+  saveJSON(KEYS.users, users);
+  // Auto-login
+  const session = { userId: user.id, name: user.name, email: user.email, storeName: user.storeName, role: user.role, plan: user.plan };
+  saveJSON(KEYS.session, session);
+  return { ok: true, user: session };
+}
+
+export function login({ email, password }) {
+  const user = users.find(u => u.email === email && u.password === password);
+  if (!user) return { ok: false, error: 'Email atau password salah' };
+  const session = { userId: user.id, name: user.name, email: user.email, storeName: user.storeName, role: user.role, plan: user.plan };
+  saveJSON(KEYS.session, session);
+  return { ok: true, user: session };
+}
+
+export function logout() {
+  localStorage.removeItem(KEYS.session);
+}
+
+export function getSession() {
+  return loadJSON(KEYS.session, null);
+}
+
+export function getCurrentUser() {
+  return getSession();
 }

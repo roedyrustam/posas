@@ -1,15 +1,19 @@
 // ========== POSAS Page Renderers ==========
-import { products, customers, transactions, invoices, bookings, getWeeklyRevenue, getStats, cart, formatRupiah, getInitials, hashColor } from './data.js';
+import { products, customers, transactions, invoices, bookings, getWeeklyRevenue, getStats, cart, formatRupiah, getInitials, hashColor, getCurrentUser } from './data.js';
 
 // ===== DASHBOARD =====
 export function renderDashboard() {
   const stats = getStats();
   const weeklyRevenue = getWeeklyRevenue();
   const maxRev = Math.max(...weeklyRevenue.map(d => d.amount), 1);
+  const user = getCurrentUser() || { name: 'Pengguna' };
+  const hour = new Date().getHours();
+  const greeting = hour < 11 ? 'Pagi' : hour < 15 ? 'Siang' : hour < 19 ? 'Sore' : 'Malam';
+
   return `
   <div class="fade-in">
     <div class="mb-16">
-      <p class="text-sm text-muted">Selamat sore, <strong>Roedy</strong> 👋</p>
+      <p class="text-sm text-muted">Selamat ${greeting}, <strong>${user.name.split(' ')[0]}</strong> 👋</p>
     </div>
 
     <div class="grid-2 mb-16">
@@ -475,13 +479,16 @@ export function renderReports() {
 
 // ===== SETTINGS =====
 export function renderSettings() {
+  const user = getCurrentUser() || { name: 'Pengguna', email: '', storeName: 'Toko Saya', plan: 'free' };
+  const initials = getInitials(user.name);
+
   return `
   <div class="fade-in">
     <div class="card mb-16 flex items-center gap-12">
-      <div class="avatar-btn" style="width:52px;height:52px;font-size:18px"><span class="avatar-text">RS</span></div>
+      <div class="avatar-btn" style="width:52px;height:52px;font-size:18px"><span class="avatar-text">${initials}</span></div>
       <div class="list-content">
-        <div class="list-title" style="font-size:16px">Roedy Santosa</div>
-        <div class="list-subtitle">roedy@email.com · Pemilik</div>
+        <div class="list-title" style="font-size:16px">${user.name}</div>
+        <div class="list-subtitle">${user.email} · Pemilik</div>
       </div>
       <span class="material-icons-round text-muted">chevron_right</span>
     </div>
@@ -532,11 +539,11 @@ export function renderSettings() {
       <span class="material-icons-round" style="color:var(--accent-light)">chevron_right</span>
     </div>
 
-    <button class="btn btn-danger btn-block" style="margin-bottom:16px">
+    <button class="btn btn-danger btn-block" id="btn-logout" style="margin-bottom:16px">
       <span class="material-icons-round" style="font-size:18px">logout</span>
       Keluar
     </button>
 
-    <p class="text-sm text-muted" style="text-align:center">POSAS v1.0.0 · Paket Gratis</p>
+    <p class="text-sm text-muted" style="text-align:center">POSAS v1.0.0 · Paket ${user.plan === 'free' ? 'Gratis' : 'Premium'}</p>
   </div>`;
 }

@@ -1,6 +1,6 @@
 // ========== POSAS Main App ==========
 import './style.css';
-import { products, customers, cart, formatRupiah, addProduct, addCustomer, addTransaction, decreaseStock, addInvoice, updateInvoiceStatus, addBooking, updateBookingStatus, deleteProduct, deleteCustomer } from './data.js';
+import { products, customers, cart, formatRupiah, addProduct, addCustomer, addTransaction, decreaseStock, addInvoice, updateInvoiceStatus, addBooking, updateBookingStatus, deleteProduct, deleteCustomer, register, login, logout, getSession, getCurrentUser } from './data.js';
 import {
   renderDashboard, renderPOS, renderProducts,
   renderCustomers, renderFinance, renderBooking,
@@ -34,6 +34,7 @@ const drawerOverlay = $('drawer-overlay');
 const toastContainer = $('toast-container');
 const modalOverlay = $('modal-overlay');
 const modalContainer = $('modal-container');
+const authScreen = $('auth-screen');
 
 // ===== Navigation =====
 function navigateTo(page) {
@@ -464,16 +465,163 @@ function bindPageEvents(page) {
       });
     });
   }
+
+  if (page === 'settings') {
+    const logoutBtn = document.getElementById('btn-logout');
+    if (logoutBtn) logoutBtn.addEventListener('click', handleLogout);
+  }
+}
+
+// ===== Auth UI =====
+function renderLoginPage() {
+  return `
+  <div class="auth-logo">
+    <div class="splash-icon"><span class="material-icons-round">rocket_launch</span></div>
+    <h1>POSAS</h1>
+    <p>Platform Operasi Serbaguna untuk Semua</p>
+  </div>
+  <div class="auth-card fade-in">
+    <h2>Masuk ke Akun</h2>
+    <div class="auth-error" id="auth-error">
+      <span class="material-icons-round" style="font-size:16px">error</span>
+      <span id="auth-error-text"></span>
+    </div>
+    <div class="input-group">
+      <label class="input-label">Email</label>
+      <input class="input" id="auth-email" type="email" placeholder="nama@email.com" />
+    </div>
+    <div class="input-group">
+      <label class="input-label">Password</label>
+      <input class="input" id="auth-password" type="password" placeholder="Masukkan password" />
+    </div>
+    <button class="btn btn-primary btn-block" id="btn-login" style="padding:14px;margin-top:4px">
+      <span class="material-icons-round" style="font-size:18px">login</span> Masuk
+    </button>
+  </div>
+  <div class="auth-footer">
+    Belum punya akun? <button class="auth-link" id="btn-goto-register">Daftar Gratis</button>
+  </div>`;
+}
+
+function renderRegisterPage() {
+  return `
+  <div class="auth-logo">
+    <div class="splash-icon"><span class="material-icons-round">rocket_launch</span></div>
+    <h1>POSAS</h1>
+    <p>Mulai kelola bisnis Anda sekarang</p>
+  </div>
+  <div class="auth-card fade-in">
+    <h2>Buat Akun Baru</h2>
+    <div class="auth-error" id="auth-error">
+      <span class="material-icons-round" style="font-size:16px">error</span>
+      <span id="auth-error-text"></span>
+    </div>
+    <div class="input-group">
+      <label class="input-label">Nama Lengkap *</label>
+      <input class="input" id="auth-name" placeholder="Contoh: Roedy Santosa" />
+    </div>
+    <div class="input-group">
+      <label class="input-label">Nama Toko *</label>
+      <input class="input" id="auth-store" placeholder="Contoh: Warung Kopi Saya" />
+    </div>
+    <div class="input-group">
+      <label class="input-label">Email *</label>
+      <input class="input" id="auth-email" type="email" placeholder="nama@email.com" />
+    </div>
+    <div class="input-group">
+      <label class="input-label">Password *</label>
+      <input class="input" id="auth-password" type="password" placeholder="Minimal 6 karakter" />
+    </div>
+    <button class="btn btn-primary btn-block" id="btn-register" style="padding:14px;margin-top:4px">
+      <span class="material-icons-round" style="font-size:18px">person_add</span> Daftar Gratis
+    </button>
+  </div>
+  <div class="auth-footer">
+    Sudah punya akun? <button class="auth-link" id="btn-goto-login">Masuk</button>
+  </div>`;
+}
+
+function showAuthScreen(type) {
+  splash.classList.add('hidden');
+  shell.classList.add('hidden');
+  authScreen.classList.remove('hidden');
+  authScreen.innerHTML = type === 'register' ? renderRegisterPage() : renderLoginPage();
+  bindAuthEvents(type);
+}
+
+function bindAuthEvents(type) {
+  if (type === 'login') {
+    $('btn-login').addEventListener('click', () => {
+      const email = $('auth-email').value.trim();
+      const password = $('auth-password').value;
+      if (!email || !password) return showAuthError('Email dan password wajib diisi.');
+      const result = login({ email, password });
+      if (!result.ok) return showAuthError(result.error);
+      enterApp(result.user);
+    });
+    $('btn-goto-register').addEventListener('click', () => showAuthScreen('register'));
+    // Enter key
+    $('auth-password').addEventListener('keydown', e => { if (e.key === 'Enter') $('btn-login').click(); });
+  } else {
+    $('btn-register').addEventListener('click', () => {
+      const name = $('auth-name').value.trim();
+      const storeName = $('auth-store').value.trim();
+      const email = $('auth-email').value.trim();
+      const password = $('auth-password').value;
+      if (!name || !storeName || !email || !password) return showAuthError('Semua field wajib diisi.');
+      if (password.length < 6) return showAuthError('Password minimal 6 karakter.');
+      if (!email.includes('@')) return showAuthError('Format email tidak valid.');
+      const result = register({ name, email, password, storeName });
+      if (!result.ok) return showAuthError(result.error);
+      enterApp(result.user);
+    });
+    $('btn-goto-login').addEventListener('click', () => showAuthScreen('login'));
+    $('auth-password').addEventListener('keydown', e => { if (e.key === 'Enter') $('btn-register').click(); });
+  }
+}
+
+function showAuthError(msg) {
+  const el = $('auth-error');
+  const txt = $('auth-error-text');
+  if (el && txt) { txt.textContent = msg; el.classList.add('show'); }
+}
+
+function enterApp(user) {
+  authScreen.classList.add('hidden');
+  shell.classList.remove('hidden');
+  // Update UI with user info
+  if (user) {
+    const initials = user.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+    document.querySelectorAll('.avatar-text').forEach(el => el.textContent = initials);
+    const tenantEl = $('tenant-name');
+    if (tenantEl) tenantEl.textContent = user.storeName || 'Toko Saya';
+    // Update drawer
+    const drawerName = document.querySelector('.drawer-user-name');
+    if (drawerName) drawerName.textContent = user.name;
+  }
+  navigateTo('dashboard');
+}
+
+function handleLogout() {
+  logout();
+  showAuthScreen('login');
 }
 
 // ===== Init =====
 function init() {
-  // Splash → App transition
-  setTimeout(() => {
+  const session = getSession();
+
+  if (!session) {
+    // No session → show login (skip splash)
     splash.classList.add('hidden');
-    shell.classList.remove('hidden');
-    navigateTo('dashboard');
-  }, 2200);
+    showAuthScreen('login');
+  } else {
+    // Has session → splash then app
+    setTimeout(() => {
+      splash.classList.add('hidden');
+      enterApp(session);
+    }, 2200);
+  }
 
   // Bottom nav
   bottomNav.querySelectorAll('.nav-item').forEach(btn => {
