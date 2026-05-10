@@ -149,9 +149,14 @@ export function renderProducts() {
 
     <div class="flex justify-between items-center mb-16">
       <span class="text-sm text-muted">${products.length} produk</span>
-      <button class="btn btn-sm btn-secondary" id="btn-sort-products">
-        <span class="material-icons-round" style="font-size:16px">sort</span> Urutkan
-      </button>
+      <div class="flex gap-8">
+        <button class="btn btn-sm btn-secondary" id="btn-import-products">
+          <span class="material-icons-round" style="font-size:16px">file_upload</span> Import
+        </button>
+        <button class="btn btn-sm btn-secondary" id="btn-sort-products">
+          <span class="material-icons-round" style="font-size:16px">sort</span> Urutkan
+        </button>
+      </div>
     </div>
 
     <div class="grid-1">

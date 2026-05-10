@@ -138,9 +138,34 @@ export async function deleteProduct(id) {
   if (idx === -1) return false;
   products.splice(idx, 1);
   saveJSON(KEYS.products, products);
-
   await supabase.from('products').delete().eq('id', id);
   return true;
+}
+
+export async function bulkAddProducts(items) {
+  const user = getSession();
+  if (!user) return { success: false, error: 'Unauthorized' };
+
+  const productsToInsert = items.map(p => ({
+    ...p,
+    user_id: user.userId,
+    tenant_id: user.tenantId,
+    emoji: p.emoji || '📦',
+    stock: Number(p.stock) || 0,
+    price: Number(p.price) || 0
+  }));
+
+  const { data, error } = await supabase
+    .from('products')
+    .insert(productsToInsert)
+    .select();
+
+  if (error) {
+    console.error(error);
+    return { success: false, error: error.message };
+  }
+  
+  return { success: true, count: data.length };
 }
 
 // --- CRUD: Customers ---

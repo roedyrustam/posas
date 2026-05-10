@@ -1,7 +1,7 @@
 // ========== POSAS Main App ==========
 import './style.css';
 import Chart from 'chart.js/auto';
-import { products, customers, cart, formatRupiah, addProduct, addCustomer, addTransaction, decreaseStock, addInvoice, updateInvoiceStatus, addBooking, updateBookingStatus, deleteProduct, deleteCustomer, register, login, logout, getSession, getCurrentUser, exportToCSV, transactions, canAccess, fetchTeam, upgradeToPro } from './data.js';
+import { products, customers, cart, formatRupiah, addProduct, addCustomer, addTransaction, decreaseStock, addInvoice, updateInvoiceStatus, addBooking, updateBookingStatus, deleteProduct, deleteCustomer, register, login, logout, getSession, getCurrentUser, exportToCSV, transactions, canAccess, fetchTeam, upgradeToPro, bulkAddProducts } from './data.js';
 import {
   renderDashboard, renderPOS, renderProducts,
   renderCustomers, renderFinance, renderBooking,
@@ -424,6 +424,127 @@ function bindPageEvents(page) {
         showToast('Booking ditandai selesai ✅');
         navigateTo('booking');
       });
+    });
+  }
+
+  // === Product events ===
+  if (page === 'products') {
+    const importBtn = document.getElementById('btn-import-products');
+    if (importBtn) {
+      importBtn.addEventListener('click', () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.csv';
+        input.onchange = async (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+
+          const reader = new FileReader();
+          reader.onload = async (event) => {
+            const content = event.target.result;
+            const lines = content.split('\n').map(l => l.trim()).filter(l => l);
+            if (lines.length < 2) {
+              showToast('File CSV kosong atau tidak valid.', 'error');
+              return;
+            }
+
+            const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+            const items = lines.slice(1).map(line => {
+              const values = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+              const obj = {};
+              headers.forEach((h, i) => { obj[h] = values[i]; });
+              return obj;
+            });
+
+            if (!headers.includes('name') || !headers.includes('price')) {
+              showToast('CSV harus memiliki kolom "name" dan "price".', 'error');
+              return;
+            }
+
+            showModal(`
+              <div class="text-center p-20">
+                <span class="material-icons-round spin mb-16" style="font-size:48px;color:var(--accent)">sync</span>
+                <h3>Mengimpor ${items.length} produk...</h3>
+                <p class="text-muted">Jangan tutup halaman ini.</p>
+              </div>
+            `);
+
+            const result = await bulkAddProducts(items);
+            if (result.success) {
+              showModal(`
+                <div class="text-center p-20">
+                  <span class="material-icons-round text-success mb-16" style="font-size:48px">check_circle</span>
+                  <h3>Berhasil! 🎉</h3>
+                  <p class="text-muted">${result.count} produk telah ditambahkan.</p>
+                  <button class="btn btn-primary btn-block mt-20" onclick="location.reload()">Selesai</button>
+                </div>
+              `);
+            } else {
+              showToast('Gagal mengimpor: ' + result.error, 'error');
+              hideModal();
+            }
+          };
+          reader.readAsText(file);
+        };
+        input.click();
+      });
+    }
+
+    const addBtn = document.getElementById('btn-add-product');
+    if (addBtn) addBtn.addEventListener('click', () => {
+      showModal(`
+        <div class="modal-title">Tambah Produk Baru</div>
+        <div class="input-group">
+          <label class="input-label">Nama Produk *</label>
+          <input class="input" id="inp-p-name" placeholder="Contoh: Kopi Susu Gula Aren" />
+        </div>
+        <div class="input-group">
+          <label class="input-label">Harga (Rp) *</label>
+          <input class="input" id="inp-p-price" type="number" placeholder="Contoh: 15000" />
+        </div>
+        <div class="input-group">
+          <label class="input-label">Stok Awal *</label>
+          <input class="input" id="inp-p-stock" type="number" placeholder="Contoh: 100" />
+        </div>
+        <div class="input-group">
+          <label class="input-label">Kategori</label>
+          <select class="input" id="inp-p-cat">
+            <option value="Umum">Umum</option>
+            <option value="Makanan">Makanan</option>
+            <option value="Minuman">Minuman</option>
+            <option value="Snack">Snack</option>
+          </select>
+        </div>
+        <div id="p-form-error" style="color:var(--danger);font-size:12px;margin-bottom:8px;display:none"></div>
+        <button class="btn btn-primary btn-block mt-8" id="btn-save-product">
+          <span class="material-icons-round" style="font-size:18px">save</span> Simpan Produk
+        </button>
+      `);
+      
+      setTimeout(() => {
+        const saveBtn = document.getElementById('btn-save-product');
+        if (saveBtn) saveBtn.addEventListener('click', async () => {
+          const name = document.getElementById('inp-p-name').value.trim();
+          const price = document.getElementById('inp-p-price').value;
+          const stock = document.getElementById('inp-p-stock').value;
+          const category = document.getElementById('inp-p-cat').value;
+          const errEl = document.getElementById('p-form-error');
+
+          if (!name || !price || !stock) {
+            errEl.textContent = 'Nama, Harga, dan Stok wajib diisi.';
+            errEl.style.display = 'block';
+            return;
+          }
+
+          saveBtn.disabled = true;
+          saveBtn.innerHTML = '<span class="material-icons-round spin">sync</span> Menyimpan...';
+
+          await addProduct({ name, price, stock, category });
+          closeModal();
+          showToast(`✅ Produk ${name} berhasil ditambahkan`);
+          navigateTo('products');
+        });
+      }, 50);
     });
   }
 

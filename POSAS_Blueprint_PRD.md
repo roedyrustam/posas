@@ -409,6 +409,7 @@ erDiagram
 - [x] Team management (roles: Owner, Kasir, Manajer)
 - [x] Advanced analytics (Chart.js)
 - [x] Subscription billing (Free → Pro)
+- [x] Bulk product import (CSV)
 - [ ] API public untuk integrasi
 - [ ] White-label / custom branding
 
