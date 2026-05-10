@@ -401,6 +401,7 @@ erDiagram
 - [ ] Multi-payment gateway (QRIS real, GoPay, OVO)
 - [x] PWA + Service Worker (offline-first)
 - [x] Export data (CSV/Excel)
+- [x] Digital Receipt (PNG download & WhatsApp Share)
 
 ### Phase 4 — Scale (Minggu 7+)
 > Fitur untuk **scaling bisnis**

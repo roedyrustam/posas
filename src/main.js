@@ -1,6 +1,7 @@
 // ========== POSAS Main App ==========
 import './style.css';
 import Chart from 'chart.js/auto';
+import * as htmlToImage from 'html-to-image';
 import { products, customers, cart, formatRupiah, addProduct, addCustomer, addTransaction, decreaseStock, addInvoice, updateInvoiceStatus, addBooking, updateBookingStatus, deleteProduct, deleteCustomer, register, login, logout, getSession, getCurrentUser, exportToCSV, transactions, canAccess, fetchTeam, upgradeToPro, bulkAddProducts } from './data.js';
 import {
   renderDashboard, renderPOS, renderProducts,
@@ -744,40 +745,77 @@ function showReceiptModal(txn) {
     </div>
   `).join('') : txn.items.map(it => `<div class="receipt-item"><span>${it}</span></div>`).join('');
 
-  showModal('Transaksi Berhasil', `
-    <div class="receipt">
-      <div class="receipt-header">
-        <div class="receipt-store">${user.storeName}</div>
-        <div class="receipt-info">${txn.date}</div>
-        <div class="receipt-info">TRX-${Math.floor(Math.random()*10000)}</div>
-      </div>
-      <div class="receipt-items">
-        ${itemsHtml}
-      </div>
-      <div class="receipt-total">
-        <span>TOTAL</span>
-        <span>${formatRupiah(txn.total)}</span>
-      </div>
-      <div class="receipt-footer">
-        <div class="receipt-qr">QR RECEIPT</div>
-        <p>Terima kasih atas kunjungan Anda!</p>
-        <p>Powered by POSAS</p>
+  showModal(`
+    <div id="receipt-capture-area" style="background:var(--bg);padding:16px;border-radius:16px">
+      <div class="receipt">
+        <div class="receipt-header">
+          <div class="receipt-store">${user.storeName}</div>
+          <div class="receipt-info">${txn.date}</div>
+          <div class="receipt-info">TRX-${txn.id.slice(0,8).toUpperCase()}</div>
+        </div>
+        <div class="receipt-items">
+          ${itemsHtml}
+        </div>
+        <div class="receipt-total">
+          <span>TOTAL</span>
+          <span>${formatRupiah(txn.total)}</span>
+        </div>
+        <div class="receipt-footer">
+          <div class="receipt-qr" style="background:#f3f4f6;padding:10px;border-radius:8px;margin-bottom:12px;font-weight:700;color:#374151;letter-spacing:2px">POSAS VERIFIED</div>
+          <p>Terima kasih atas kunjungan Anda!</p>
+          <p style="font-size:10px;color:var(--text-muted)">Disimpan secara aman oleh POSAS SaaS</p>
+        </div>
       </div>
     </div>
-    <div class="flex gap-12 mt-16">
-      <button class="btn btn-secondary flex-1" onclick="closeModal(); navigateTo('pos')">Tutup</button>
-      <button class="btn btn-primary flex-1" id="btn-print-receipt">
-        <span class="material-icons-round" style="font-size:18px">print</span> Cetak
+    <div class="grid-2 mt-16">
+      <button class="btn btn-secondary" id="btn-download-receipt">
+        <span class="material-icons-round" style="font-size:18px">download</span> Gambar
+      </button>
+      <button class="btn btn-primary" id="btn-wa-receipt" style="background:#25D366;border-color:#25D366">
+        <span class="material-icons-round" style="font-size:18px">chat</span> WhatsApp
       </button>
     </div>
+    <button class="btn btn-ghost btn-block mt-8" onclick="closeModal(); navigateTo('pos')">Selesai</button>
   `);
   
   setTimeout(() => {
-    const printBtn = document.getElementById('btn-print-receipt');
-    if (printBtn) printBtn.addEventListener('click', () => {
-      window.print();
+    // Download logic
+    document.getElementById('btn-download-receipt').addEventListener('click', async () => {
+      const btn = document.getElementById('btn-download-receipt');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="material-icons-round spin">sync</span>';
+      
+      const node = document.getElementById('receipt-capture-area');
+      try {
+        const dataUrl = await htmlToImage.toPng(node, { backgroundColor: '#ffffff', quality: 1 });
+        const link = document.createElement('a');
+        link.download = `Struk-${txn.id.slice(0,8)}.png`;
+        link.href = dataUrl;
+        link.click();
+        showToast('Struk berhasil diunduh 🖼️');
+      } catch (err) {
+        showToast('Gagal mengunduh gambar', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<span class="material-icons-round" style="font-size:18px">download</span> Gambar';
+      }
     });
-  }, 50);
+
+    // WhatsApp logic
+    document.getElementById('btn-wa-receipt').addEventListener('click', () => {
+      const itemsList = txn.cartItems ? txn.cartItems.map(i => `- ${i.name} (x${i.qty}): ${formatRupiah(i.price * i.qty)}`).join('%0A') : '';
+      const text = `*STRUK DIGITAL ${user.storeName}*%0A%0A` +
+                   `Tanggal: ${txn.date}%0A` +
+                   `ID: TRX-${txn.id.slice(0,8).toUpperCase()}%0A` +
+                   `----------------------------%0A` +
+                   `${itemsList}%0A` +
+                   `----------------------------%0A` +
+                   `*TOTAL: ${formatRupiah(txn.total)}*%0A%0A` +
+                   `Terima kasih telah berbelanja!`;
+      
+      window.open(`https://wa.me/?text=${text}`, '_blank');
+    });
+  }, 100);
 }
 
 // ===== Auth UI =====
