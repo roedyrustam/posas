@@ -125,6 +125,7 @@ const pages = {
   booking:    { title: 'Booking',   render: renderBooking },
   invoices:   { title: 'Invoice',   render: renderInvoices },
   reports:    { title: 'Laporan',   render: renderReports, pro: true },
+  logs:       { title: 'Aktivitas', render: renderLogs, pro: true },
   settings:   { title: 'Pengaturan', render: renderSettings },
   team:       { title: 'Manajemen Tim', render: renderTeam },
   pricing:    { title: 'POSAS Pro', render: renderPricing },
@@ -427,6 +428,7 @@ async function completeTransaction(paymentMethod, overriddenTotal) {
   selectedPOSCustomer = null; // Reset customer
   closeModal();
   showReceiptModal(txn);
+  addLog('Transaksi Baru', `Penjualan senilai ${formatRupiah(total)} kepada ${txn.customer}`);
 }
 
 // ===== Page-specific event binding =====
@@ -840,6 +842,7 @@ function bindPageEvents(page) {
           saveBtn.innerHTML = '<span class="material-icons-round spin">sync</span> Menyimpan...';
 
           await addProduct({ name, price, stock, category });
+          addLog('Tambah Produk', `Produk baru: ${name} (Stok: ${stock})`);
           closeModal();
           showToast(`✅ Produk ${name} berhasil ditambahkan`);
           navigateTo('products');
@@ -900,12 +903,20 @@ function bindPageEvents(page) {
         });
       }, 50);
     });
-    document.querySelectorAll('.btn-inv-status').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        btn.disabled = true;
-        await updateInvoiceStatus(btn.dataset.id, btn.dataset.status);
-        showToast(btn.dataset.status === 'paid' ? '✅ Invoice lunas!' : '📤 Invoice terkirim!');
+    document.querySelectorAll('.btn-inv-status').forEach(el => {
+      el.addEventListener('click', async () => {
+        const id = el.dataset.id;
+        const status = el.dataset.status;
+        await updateInvoiceStatus(id, status);
+        addLog('Update Invoice', `Status invoice ${id} diubah ke ${status}`);
         navigateTo('invoices');
+        showToast(status === 'paid' ? '✅ Invoice lunas!' : '📤 Invoice terkirim!');
+      });
+    });
+
+    document.querySelectorAll('.btn-view-invoice').forEach(el => {
+      el.addEventListener('click', () => {
+        showInvoiceModal(el.dataset.id);
       });
     });
   }
