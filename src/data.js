@@ -12,6 +12,7 @@ const KEYS = {
   session: 'posas_session',
   branding: 'posas_branding',
   staff: 'posas_staff',
+  logs: 'posas_logs'
 };
 
 function loadJSON(key, fallback) {
@@ -77,6 +78,7 @@ export let transactions = loadJSON(KEYS.transactions, DEFAULT_TRANSACTIONS);
 export let invoices = loadJSON(KEYS.invoices, []);
 export let bookings = loadJSON(KEYS.bookings, []);
 export let staff = loadJSON(KEYS.staff, DEFAULT_STAFF);
+export let logs = loadJSON(KEYS.logs, []);
 
 // --- Branding (Appearance & Store Info) ---
 const DEFAULT_BRANDING = {
@@ -724,4 +726,21 @@ export async function removeStaff(id) {
     return true;
   }
   return false;
+}
+
+// --- Audit Logs ---
+export function addLog(action, details) {
+  const user = getSession();
+  const log = {
+    id: 'l' + Date.now(),
+    user: user ? user.name : 'System',
+    role: user ? user.role : 'system',
+    action,
+    details: details || '',
+    timestamp: new Date().toISOString()
+  };
+  logs.unshift(log);
+  if (logs.length > 100) logs.pop(); // Keep last 100 logs
+  saveJSON(KEYS.logs, logs);
+  return log;
 }

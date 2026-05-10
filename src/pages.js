@@ -415,10 +415,14 @@ export function renderInvoices() {
           <span class="list-subtitle">${inv.createdAt}</span>
           <span class="fw-700">${formatRupiah(inv.total)}</span>
         </div>
-        ${inv.status !== 'paid' ? `<div class="flex gap-8" style="margin-top:10px">
-          ${inv.status === 'draft' ? `<button class="btn btn-sm btn-secondary btn-inv-status" data-id="${inv.id}" data-status="sent">Kirim</button>` : ''}
-          <button class="btn btn-sm btn-primary btn-inv-status" data-id="${inv.id}" data-status="paid">Tandai Lunas</button>
-        </div>` : ''}
+        <div class="flex gap-8" style="margin-top:12px">
+          <button class="btn btn-sm btn-ghost btn-view-invoice" data-id="${inv.id}" style="border:1px solid var(--border-color)">
+            <span class="material-icons-round" style="font-size:16px">visibility</span> Lihat
+          </button>
+          ${inv.status !== 'paid' ? `
+            <button class="btn btn-sm btn-primary btn-inv-status" data-id="${inv.id}" data-status="paid">Lunas</button>
+          ` : ''}
+        </div>
       </div>`;
     }).join('')}
     </div>
@@ -968,4 +972,94 @@ export function renderReports() {
       </div>
     </div>
   </div>`;
+}
+export function renderLogs() {
+  return `
+  <div class="fade-in">
+    <div class="section-header">
+      <span class="section-title">Audit Logs</span>
+      <span class="text-xs text-muted">Aktivitas Terakhir</span>
+    </div>
+    <div class="card" style="padding:0">
+      ${logs.length > 0 ? logs.map(log => `
+        <div class="list-item" style="border-bottom:1px solid var(--border-color); padding:12px 16px">
+          <div class="list-avatar" style="background:var(--accent-glow);color:var(--accent)">
+            <span class="material-icons-round" style="font-size:18px">
+              ${log.action.includes('Delete') ? 'delete_forever' : log.action.includes('Update') ? 'edit' : 'add_circle'}
+            </span>
+          </div>
+          <div class="list-content">
+            <div class="flex justify-between items-center">
+              <div class="list-title" style="font-size:14px">${log.action}</div>
+              <span class="text-xs text-muted">${new Date(log.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+            </div>
+            <div class="list-subtitle" style="font-size:12px">Oleh <b>${log.user}</b> (${log.role})</div>
+            ${log.details ? `<div class="text-xs mt-4 color-muted">${log.details}</div>` : ''}
+          </div>
+        </div>
+      `).join('') : '<div class="p-24 text-center text-muted">Belum ada riwayat aktivitas</div>'}
+    </div>
+  </div>`;
+}
+
+export function renderInvoiceDetail(invId) {
+  const inv = invoices.find(i => i.id === invId);
+  if (!inv) return 'Invoice tidak ditemukan';
+  
+  return `
+    <div id="invoice-capture-area" class="p-24" style="background:#fff; color:#1e293b; border-radius:12px; font-family:'Inter', sans-serif">
+      <div class="flex justify-between items-start mb-32">
+        <div>
+          <div style="font-size:32px; font-weight:800; color:var(--accent); letter-spacing:-1px">${branding.storeName}</div>
+          <div style="color:#64748b; font-size:14px">${branding.storeEmoji} Official Invoice</div>
+        </div>
+        <div class="text-right">
+          <div style="font-size:18px; font-weight:700">${inv.number}</div>
+          <div style="color:#64748b; font-size:12px">Dibuat: ${inv.createdAt}</div>
+        </div>
+      </div>
+      
+      <div class="mb-32">
+        <div style="color:#64748b; font-size:11px; text-transform:uppercase; font-weight:700; margin-bottom:4px">Ditagihkan Ke:</div>
+        <div style="font-size:16px; font-weight:600">${inv.customer}</div>
+      </div>
+      
+      <table style="width:100%; border-collapse:collapse; margin-bottom:32px">
+        <thead>
+          <tr style="border-bottom:2px solid #f1f5f9; text-align:left">
+            <th style="padding:12px 0; font-size:12px; color:#64748b">DESKRIPSI</th>
+            <th style="padding:12px 0; font-size:12px; color:#64748b; text-align:center">QTY</th>
+            <th style="padding:12px 0; font-size:12px; color:#64748b; text-align:right">HARGA</th>
+            <th style="padding:12px 0; font-size:12px; color:#64748b; text-align:right">SUBTOTAL</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${inv.items.map(item => `
+            <tr style="border-bottom:1px solid #f1f5f9">
+              <td style="padding:12px 0; font-weight:600">${item.name}</td>
+              <td style="padding:12px 0; text-align:center">${item.qty}</td>
+              <td style="padding:12px 0; text-align:right">${formatRupiah(item.price)}</td>
+              <td style="padding:12px 0; text-align:right; font-weight:600">${formatRupiah(item.price * item.qty)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+      
+      <div class="flex justify-end">
+        <div style="width:200px">
+          <div class="flex justify-between mb-8">
+            <span style="color:#64748b">Total</span>
+            <span style="font-weight:800; font-size:18px">${formatRupiah(inv.total)}</span>
+          </div>
+          <div style="background:${inv.status === 'paid' ? '#dcfce7' : '#fee2e2'}; color:${inv.status === 'paid' ? '#166534' : '#991b1b'}; padding:8px; border-radius:6px; text-align:center; font-weight:700; font-size:12px">
+            ${inv.status.toUpperCase()}
+          </div>
+        </div>
+      </div>
+      
+      <div style="margin-top:48px; border-top:1px solid #f1f5f9; padding-top:16px; font-size:11px; color:#94a3b8; text-align:center">
+        ${branding.receiptFooter}
+      </div>
+    </div>
+  `;
 }
