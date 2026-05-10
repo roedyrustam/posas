@@ -1,11 +1,11 @@
 // ========== POSAS Main App ==========
 import './style.css';
 import Chart from 'chart.js/auto';
-import { products, customers, cart, formatRupiah, addProduct, addCustomer, addTransaction, decreaseStock, addInvoice, updateInvoiceStatus, addBooking, updateBookingStatus, deleteProduct, deleteCustomer, register, login, logout, getSession, getCurrentUser, exportToCSV, transactions, canAccess, fetchTeam } from './data.js';
+import { products, customers, cart, formatRupiah, addProduct, addCustomer, addTransaction, decreaseStock, addInvoice, updateInvoiceStatus, addBooking, updateBookingStatus, deleteProduct, deleteCustomer, register, login, logout, getSession, getCurrentUser, exportToCSV, transactions, canAccess, fetchTeam, upgradeToPro } from './data.js';
 import {
   renderDashboard, renderPOS, renderProducts,
   renderCustomers, renderFinance, renderBooking,
-  renderInvoices, renderReports, renderSettings, renderTeam
+  renderInvoices, renderReports, renderSettings, renderTeam, renderPricing
 } from './pages.js';
 import { getWeeklyRevenue } from './data.js';
 
@@ -21,6 +21,7 @@ const pages = {
   reports:    { title: 'Laporan',   render: renderReports },
   settings:   { title: 'Pengaturan', render: renderSettings },
   team:       { title: 'Manajemen Tim', render: renderTeam },
+  pricing:    { title: 'Paket Berlangganan', render: renderPricing },
 };
 
 let currentPage = 'dashboard';
@@ -532,6 +533,34 @@ function bindPageEvents(page) {
     if (inviteBtn) inviteBtn.addEventListener('click', () => {
       showToast('Fitur kirim undangan staf akan segera hadir! 📧', 'info');
     });
+  }
+
+  if (page === 'pricing') {
+    const upgradeBtn = document.getElementById('btn-upgrade-pro');
+    if (upgradeBtn) {
+      upgradeBtn.addEventListener('click', async () => {
+        upgradeBtn.disabled = true;
+        upgradeBtn.innerHTML = '<span class="material-icons-round spin">sync</span> Memproses...';
+        
+        const success = await upgradeToPro();
+        if (success) {
+          showModal(`
+            <div class="text-center p-20">
+              <div class="stat-icon green mx-auto mb-20" style="width:64px;height:64px">
+                <span class="material-icons-round" style="font-size:32px">diamond</span>
+              </div>
+              <h2 class="fw-700 mb-8">Selamat! 🎉</h2>
+              <p class="text-muted mb-24">Akun Anda sekarang telah diupgrade ke **Paket Pro**. Semua fitur premium telah terbuka!</p>
+              <button class="btn btn-primary btn-block" onclick="location.reload()">Mulai Sekarang</button>
+            </div>
+          `);
+        } else {
+          showToast('Gagal memproses upgrade. Coba lagi nanti.', 'error');
+          upgradeBtn.disabled = false;
+          upgradeBtn.innerText = 'Upgrade ke Pro';
+        }
+      });
+    }
   }
 
   // Initialize charts for Dashboard and Reports

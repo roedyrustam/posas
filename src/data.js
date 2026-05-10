@@ -523,7 +523,37 @@ export function canAccess(action) {
   };
   
   const allowed = permissions[user.role.toLowerCase()] || [];
-  return allowed.includes(action);
+  if (!allowed.includes(action)) return false;
+
+  // Plan-based restrictions
+  const proFeatures = ['reports', 'manage_staff', 'delete_data'];
+  if (proFeatures.includes(action) && user.plan !== 'pro') {
+    return false;
+  }
+
+  return true;
+}
+
+export async function upgradeToPro() {
+  const user = getSession();
+  if (!user) return false;
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({ plan: 'pro' })
+    .eq('id', user.userId);
+
+  if (error) {
+    console.error(error);
+    return false;
+  }
+
+  // Update local session
+  const session = JSON.parse(localStorage.getItem('posas_session'));
+  session.plan = 'pro';
+  localStorage.setItem('posas_session', JSON.stringify(session));
+  
+  return true;
 }
 
 export async function fetchTeam() {

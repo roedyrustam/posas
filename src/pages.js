@@ -533,7 +533,7 @@ export function renderSettings() {
       </div>
     </div>
 
-    <div class="card flex items-center gap-12 mb-16" style="padding:14px 16px;border-color:rgba(99,102,241,0.3);background:rgba(99,102,241,0.08)">
+    <div class="card flex items-center gap-12 mb-16 section-link" data-page="pricing" style="padding:14px 16px;border-color:rgba(99,102,241,0.3);background:rgba(99,102,241,0.08);cursor:pointer">
       <span class="material-icons-round" style="color:var(--accent-light)">diamond</span>
       <div class="list-content">
         <div class="list-title" style="color:var(--accent-light)">Upgrade ke Pro</div>
@@ -585,5 +585,63 @@ export function renderTeam() {
         </div>
       </div>
     </div>
+  </div>`;
+}
+export function renderPricing() {
+  const user = getCurrentUser() || { plan: 'free' };
+  
+  return `
+  <div class="p-20 fade-in">
+    <div class="text-center mb-32">
+      <h2 class="fw-700" style="font-size:24px">Pilih Paket Bisnis Anda</h2>
+      <p class="text-muted text-sm">Upgrade untuk membuka potensi penuh POSAS</p>
+    </div>
+
+    <div class="grid-1 gap-20">
+      <!-- Free Plan -->
+      <div class="card p-24" style="${user.plan === 'free' ? 'border: 2px solid var(--accent); position: relative' : 'opacity: 0.8'}">
+        ${user.plan === 'free' ? '<span class="badge badge-primary" style="position:absolute; top:-12px; right:20px">PAKET ANDA</span>' : ''}
+        <div class="fw-700 text-lg mb-4">Gratis</div>
+        <div class="flex items-baseline gap-4 mb-16">
+          <span class="fw-700" style="font-size:32px">Rp 0</span>
+          <span class="text-muted text-sm">/selamanya</span>
+        </div>
+        <ul class="text-sm text-muted mb-24" style="padding-left:16px; list-style: disc">
+          <li class="mb-8">Kelola Produk & Stok</li>
+          <li class="mb-8">Point of Sale (POS)</li>
+          <li class="mb-8">Manajemen Pelanggan</li>
+          <li class="mb-8" style="text-decoration: line-through; opacity:0.5">Laporan & Analitik</li>
+          <li class="mb-8" style="text-decoration: line-through; opacity:0.5">Manajemen Tim (Staf)</li>
+        </ul>
+        <button class="btn btn-secondary btn-block" disabled>Sedang Digunakan</button>
+      </div>
+
+      <!-- Pro Plan -->
+      <div class="card p-24" style="${user.plan === 'pro' ? 'border: 2px solid var(--accent); position: relative' : 'border-color: rgba(99, 102, 241, 0.3); background: linear-gradient(to bottom, rgba(99,102,241,0.05), transparent)'}">
+        ${user.plan === 'pro' ? '<span class="badge badge-primary" style="position:absolute; top:-12px; right:20px">PAKET ANDA</span>' : '<span class="badge badge-warning" style="position:absolute; top:-12px; right:20px">TERPOPULER</span>'}
+        <div class="flex items-center gap-8 mb-4">
+          <div class="fw-700 text-lg">Pro</div>
+          <span class="material-icons-round text-warning" style="font-size:18px">diamond</span>
+        </div>
+        <div class="flex items-baseline gap-4 mb-16">
+          <span class="fw-700" style="font-size:32px">Rp 99.000</span>
+          <span class="text-muted text-sm">/bulan</span>
+        </div>
+        <ul class="text-sm mb-24" style="padding-left:16px; list-style: disc">
+          <li class="mb-8">Semua fitur Paket Gratis</li>
+          <li class="mb-8 fw-600">Laporan & Analitik Canggih</li>
+          <li class="mb-8 fw-600">Manajemen Tim (Unlimited Staf)</li>
+          <li class="mb-8 fw-600">Export Data (Excel/CSV/PDF)</li>
+          <li class="mb-8 fw-600">Backup Data Otomatis</li>
+        </ul>
+        <button class="btn btn-primary btn-block" id="btn-upgrade-pro" ${user.plan === 'pro' ? 'disabled' : ''}>
+          ${user.plan === 'pro' ? 'Paket Aktif' : 'Upgrade ke Pro'}
+        </button>
+      </div>
+    </div>
+
+    <p class="text-xs text-muted text-center mt-24">
+      Pembayaran aman. Batalkan kapan saja.<br>Butuh bantuan? <span class="text-accent">Hubungi CS</span>
+    </p>
   </div>`;
 }
