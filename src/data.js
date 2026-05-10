@@ -1,4 +1,4 @@
-// ========== POSAS Data Store — localStorage Persistence ==========
+import { supabase } from './supabase.js';
 
 // --- Storage Helpers ---
 const KEYS = {
@@ -339,44 +339,70 @@ export function resetAllData() {
   location.reload();
 }
 
-// ========== AUTH SYSTEM ==========
-const users = loadJSON(KEYS.users, []);
+// ========== AUTH SYSTEM (Supabase) ==========
 
-export function register({ name, email, password, storeName }) {
-  if (users.find(u => u.email === email)) {
-    return { ok: false, error: 'Email sudah terdaftar' };
-  }
-  const user = {
-    id: 'u' + Date.now(),
-    name,
+export async function register({ name, email, password, storeName }) {
+  const { data, error } = await supabase.auth.signUp({
     email,
-    password, // NOTE: plain text for demo only — use bcrypt+backend in production
-    storeName: storeName || 'Toko Saya',
-    role: 'owner',
-    plan: 'free',
-    createdAt: new Date().toISOString().slice(0, 10),
+    password,
+    options: {
+      data: {
+        full_name: name,
+        store_name: storeName
+      }
+    }
+  });
+
+  if (error) return { ok: false, error: error.message };
+  
+  // Sesi otomatis tersimpan oleh Supabase client
+  const user = data.user;
+  const session = { 
+    userId: user.id, 
+    name: name, 
+    email: user.email, 
+    storeName: storeName, 
+    role: 'owner', 
+    plan: 'free' 
   };
-  users.push(user);
-  saveJSON(KEYS.users, users);
-  // Auto-login
-  const session = { userId: user.id, name: user.name, email: user.email, storeName: user.storeName, role: user.role, plan: user.plan };
+  saveJSON(KEYS.session, session); // Sinkronkan ke local storage juga untuk kenyamanan
+  return { ok: true, user: session };
+}
+
+export async function login({ email, password }) {
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password
+  });
+
+  if (error) return { ok: false, error: error.message };
+
+  // Ambil profile dari table profiles
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', data.user.id)
+    .single();
+
+  const session = { 
+    userId: data.user.id, 
+    name: profile ? profile.full_name : data.user.email, 
+    email: data.user.email, 
+    storeName: profile ? profile.store_name : 'Toko Saya', 
+    role: 'owner', 
+    plan: profile ? profile.plan : 'free' 
+  };
   saveJSON(KEYS.session, session);
   return { ok: true, user: session };
 }
 
-export function login({ email, password }) {
-  const user = users.find(u => u.email === email && u.password === password);
-  if (!user) return { ok: false, error: 'Email atau password salah' };
-  const session = { userId: user.id, name: user.name, email: user.email, storeName: user.storeName, role: user.role, plan: user.plan };
-  saveJSON(KEYS.session, session);
-  return { ok: true, user: session };
-}
-
-export function logout() {
+export async function logout() {
+  await supabase.auth.signOut();
   localStorage.removeItem(KEYS.session);
 }
 
 export function getSession() {
+  // Gunakan local storage untuk check session cepat di init
   return loadJSON(KEYS.session, null);
 }
 

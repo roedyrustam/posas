@@ -551,28 +551,46 @@ function showAuthScreen(type) {
 
 function bindAuthEvents(type) {
   if (type === 'login') {
-    $('btn-login').addEventListener('click', () => {
+    $('btn-login').addEventListener('click', async () => {
       const email = $('auth-email').value.trim();
       const password = $('auth-password').value;
       if (!email || !password) return showAuthError('Email dan password wajib diisi.');
-      const result = login({ email, password });
-      if (!result.ok) return showAuthError(result.error);
+      
+      $('btn-login').disabled = true;
+      $('btn-login').innerHTML = '<span class="material-icons-round spin" style="font-size:18px">sync</span> Memproses...';
+      
+      const result = await login({ email, password });
+      
+      if (!result.ok) {
+        $('btn-login').disabled = false;
+        $('btn-login').innerHTML = '<span class="material-icons-round" style="font-size:18px">login</span> Masuk';
+        return showAuthError(result.error);
+      }
       enterApp(result.user);
     });
     $('btn-goto-register').addEventListener('click', () => showAuthScreen('register'));
     // Enter key
     $('auth-password').addEventListener('keydown', e => { if (e.key === 'Enter') $('btn-login').click(); });
   } else {
-    $('btn-register').addEventListener('click', () => {
+    $('btn-register').addEventListener('click', async () => {
       const name = $('auth-name').value.trim();
       const storeName = $('auth-store').value.trim();
       const email = $('auth-email').value.trim();
       const password = $('auth-password').value;
+      
       if (!name || !storeName || !email || !password) return showAuthError('Semua field wajib diisi.');
       if (password.length < 6) return showAuthError('Password minimal 6 karakter.');
-      if (!email.includes('@')) return showAuthError('Format email tidak valid.');
-      const result = register({ name, email, password, storeName });
-      if (!result.ok) return showAuthError(result.error);
+      
+      $('btn-register').disabled = true;
+      $('btn-register').innerHTML = '<span class="material-icons-round spin" style="font-size:18px">sync</span> Mendaftar...';
+      
+      const result = await register({ name, email, password, storeName });
+      
+      if (!result.ok) {
+        $('btn-register').disabled = false;
+        $('btn-register').innerHTML = '<span class="material-icons-round" style="font-size:18px">person_add</span> Daftar Gratis';
+        return showAuthError(result.error);
+      }
       enterApp(result.user);
     });
     $('btn-goto-login').addEventListener('click', () => showAuthScreen('login'));
@@ -602,8 +620,8 @@ function enterApp(user) {
   navigateTo('dashboard');
 }
 
-function handleLogout() {
-  logout();
+async function handleLogout() {
+  await logout();
   showAuthScreen('login');
 }
 
