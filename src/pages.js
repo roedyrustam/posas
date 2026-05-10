@@ -1,5 +1,5 @@
 // ========== POSAS Page Renderers ==========
-import { products, customers, transactions, invoices, bookings, getWeeklyRevenue, getStats, cart, formatRupiah, getInitials, hashColor, getCurrentUser } from './data.js';
+import { products, customers, transactions, invoices, bookings, getWeeklyRevenue, getStats, cart, formatRupiah, getInitials, hashColor, getCurrentUser, branding } from './data.js';
 
 // ===== DASHBOARD =====
 export function renderDashboard() {
@@ -483,7 +483,7 @@ export function renderSettings() {
   return `
   <div class="fade-in">
     <div class="card mb-16 flex items-center gap-12">
-      <div class="avatar-btn" style="width:52px;height:52px;font-size:18px"><span class="avatar-text">${initials}</span></div>
+      <div class="avatar-btn" style="width:52px;height:52px;font-size:18px;background:var(--accent)"><span class="avatar-text">${initials}</span></div>
       <div class="list-content">
         <div class="list-title" style="font-size:16px">${user.name}</div>
         <div class="list-subtitle">${user.email} · Pemilik</div>
@@ -493,21 +493,39 @@ export function renderSettings() {
 
     <div class="section-title mb-8" style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px">Toko</div>
     <div class="grid-1 mb-16">
-      ${[
-        ['storefront', 'Profil Toko', 'Nama, alamat, logo'],
-        ['palette', 'Tampilan', 'Tema dan warna'],
-        ['print', 'Struk & Nota', 'Template dan printer'],
-        ['payments', 'Metode Pembayaran', 'QRIS, tunai, transfer'],
-      ].map(([icon, title, sub]) => `
-        <div class="card flex items-center gap-12" style="padding:14px 16px;cursor:pointer">
-          <span class="material-icons-round text-muted">${icon}</span>
-          <div class="list-content">
-            <div class="list-title">${title}</div>
-            <div class="list-subtitle">${sub}</div>
-          </div>
-          <span class="material-icons-round text-muted">chevron_right</span>
+      <div class="card flex items-center gap-12 section-link" data-page="storeProfile" style="padding:14px 16px;cursor:pointer">
+        <span class="material-icons-round text-muted">storefront</span>
+        <div class="list-content">
+          <div class="list-title">Profil Toko</div>
+          <div class="list-subtitle">Nama: ${branding.storeName}</div>
         </div>
-      `).join('')}
+        <span class="material-icons-round text-muted">chevron_right</span>
+      </div>
+      <div class="card flex items-center gap-12 section-link" data-page="appearance" style="padding:14px 16px;cursor:pointer">
+        <span class="material-icons-round text-muted">palette</span>
+        <div class="list-content">
+          <div class="list-title">Tampilan</div>
+          <div class="list-subtitle">Tema dan warna aksen</div>
+        </div>
+        <div style="width:12px;height:12px;border-radius:50%;background:var(--accent)"></div>
+        <span class="material-icons-round text-muted">chevron_right</span>
+      </div>
+      <div class="card flex items-center gap-12 section-link" data-page="receiptSettings" style="padding:14px 16px;cursor:pointer">
+        <span class="material-icons-round text-muted">print</span>
+        <div class="list-content">
+          <div class="list-title">Struk & Nota</div>
+          <div class="list-subtitle">Header, footer, dan logo</div>
+        </div>
+        <span class="material-icons-round text-muted">chevron_right</span>
+      </div>
+      <div class="card flex items-center gap-12" style="padding:14px 16px;cursor:pointer">
+        <span class="material-icons-round text-muted">payments</span>
+        <div class="list-content">
+          <div class="list-title">Metode Pembayaran</div>
+          <div class="list-subtitle">QRIS, tunai, transfer</div>
+        </div>
+        <span class="material-icons-round text-muted">chevron_right</span>
+      </div>
     </div>
 
     <div class="section-title mb-8" style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px">Akun</div>
@@ -648,5 +666,116 @@ export function renderPricing() {
     <p class="text-xs text-muted text-center mt-24">
       Pembayaran aman. Batalkan kapan saja.<br>Butuh bantuan? <span class="text-accent">Hubungi CS</span>
     </p>
+  </div>`;
+}
+
+// ===== CUSTOM BRANDING PAGES =====
+
+export function renderAppearance() {
+  const colors = [
+    { name: 'Indigo', hex: '#6366f1' },
+    { name: 'Purple', hex: '#a855f7' },
+    { name: 'Rose', hex: '#f43f5e' },
+    { name: 'Amber', hex: '#f59e0b' },
+    { name: 'Emerald', hex: '#10b981' },
+    { name: 'Blue', hex: '#3b82f6' },
+    { name: 'Cyan', hex: '#06b6d4' },
+    { name: 'Slate', hex: '#64748b' }
+  ];
+
+  return `
+  <div class="fade-in">
+    <div class="section">
+      <div class="section-header"><span class="section-title">Warna Aksen</span></div>
+      <p class="text-sm text-muted mb-16">Pilih warna yang sesuai dengan identitas brand Anda.</p>
+      <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:12px">
+        ${colors.map(c => `
+          <div class="color-picker-item ${branding.accent === c.hex ? 'active' : ''}" 
+               data-color="${c.hex}" 
+               style="background:${c.hex}; height:60px; border-radius:var(--radius-md); cursor:pointer; position:relative; border: 2px solid transparent">
+            ${branding.accent === c.hex ? '<span class="material-icons-round" style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); color:white">check</span>' : ''}
+          </div>
+        `).join('')}
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header"><span class="section-title">Tema Aplikasi</span></div>
+      <div class="card flex items-center justify-between p-16">
+        <div class="flex items-center gap-12">
+          <span class="material-icons-round text-muted">dark_mode</span>
+          <div class="list-title">Mode Gelap</div>
+        </div>
+        <span class="badge badge-success">Aktif</span>
+      </div>
+      <p class="text-xs text-muted mt-8">Mode terang akan tersedia di versi mendatang.</p>
+    </div>
+
+    <button class="btn btn-primary btn-block mt-24" id="btn-save-appearance">
+      Simpan Perubahan
+    </button>
+  </div>
+  <style>
+    .color-picker-item.active { border-color: white !important; box-shadow: 0 0 15px rgba(255,255,255,0.3); }
+  </style>`;
+}
+
+export function renderStoreProfile() {
+  return `
+  <div class="fade-in">
+    <div class="card p-20 mb-20">
+      <div class="input-group">
+        <label class="input-label">Nama Toko</label>
+        <input class="input" id="inp-store-name" value="${branding.storeName}" placeholder="Nama Bisnis Anda" />
+      </div>
+      <div class="input-group">
+        <label class="input-label">Ikon Toko (Emoji)</label>
+        <div class="flex gap-12 items-center">
+          <input class="input" id="inp-store-emoji" value="${branding.storeEmoji}" placeholder="🏪" maxlength="4" style="width:80px; text-align:center; font-size:24px" />
+          <p class="text-xs text-muted">Pilih emoji yang menggambarkan bisnis Anda (misal: ☕, 🍛, 🛍️)</p>
+        </div>
+      </div>
+    </div>
+    <button class="btn btn-primary btn-block" id="btn-save-store-profile">
+      Simpan Profil
+    </button>
+  </div>`;
+}
+
+export function renderReceiptSettings() {
+  return `
+  <div class="fade-in">
+    <div class="section">
+      <div class="section-header"><span class="section-title">Preview Struk</span></div>
+      <div class="receipt mb-24" id="receipt-preview">
+        <div class="receipt-header">
+          <div class="receipt-store" id="preview-store-name">${branding.storeName}</div>
+          <div class="receipt-info" id="preview-header-text">${branding.receiptHeader}</div>
+        </div>
+        <div class="receipt-items">
+          <div class="receipt-item"><span>Produk Contoh</span><span>Rp 25.000</span></div>
+          <div class="receipt-item"><span>Minuman Segar</span><span>Rp 10.000</span></div>
+        </div>
+        <div class="receipt-total"><span>TOTAL</span><span>Rp 35.000</span></div>
+        <div class="receipt-footer">
+          <p id="preview-footer-text">${branding.receiptFooter}</p>
+          <p>Terima Kasih</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card p-20 mb-20">
+      <div class="input-group">
+        <label class="input-label">Header Struk</label>
+        <textarea class="input" id="inp-receipt-header" rows="2" style="resize:none">${branding.receiptHeader}</textarea>
+      </div>
+      <div class="input-group">
+        <label class="input-label">Footer Struk</label>
+        <textarea class="input" id="inp-receipt-footer" rows="2" style="resize:none">${branding.receiptFooter}</textarea>
+      </div>
+    </div>
+    <button class="btn btn-primary btn-block" id="btn-save-receipt">
+      Simpan Pengaturan
+    </button>
   </div>`;
 }

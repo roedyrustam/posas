@@ -10,6 +10,7 @@ const KEYS = {
   bookings: 'posas_bookings',
   users: 'posas_users',
   session: 'posas_session',
+  branding: 'posas_branding',
 };
 
 function loadJSON(key, fallback) {
@@ -69,6 +70,17 @@ export let customers = loadJSON(KEYS.customers, DEFAULT_CUSTOMERS);
 export let transactions = loadJSON(KEYS.transactions, DEFAULT_TRANSACTIONS);
 export let invoices = loadJSON(KEYS.invoices, []);
 export let bookings = loadJSON(KEYS.bookings, []);
+
+// --- Branding (Appearance & Store Info) ---
+const DEFAULT_BRANDING = {
+  accent: '#6366f1',
+  storeName: 'Toko Saya',
+  storeEmoji: '🏪',
+  receiptHeader: 'Terima kasih telah berbelanja!',
+  receiptFooter: 'Silakan berkunjung kembali.',
+  theme: 'dark' // currently only dark is fully supported by CSS
+};
+export let branding = loadJSON(KEYS.branding, DEFAULT_BRANDING);
 
 // --- Cloud Sync ---
 export async function syncCloudData() {
@@ -579,6 +591,15 @@ export async function upgradeToPro() {
   localStorage.setItem('posas_session', JSON.stringify(session));
   
   return true;
+}
+
+export async function updateBranding(updates) {
+  Object.assign(branding, updates);
+  saveJSON(KEYS.branding, branding);
+  
+  // Optional: Sync to Supabase if we have a table for it
+  // For now, keep it local-first as part of the white-label UX
+  return branding;
 }
 
 export async function fetchTeam() {

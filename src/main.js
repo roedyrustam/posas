@@ -3,11 +3,12 @@ import './style.css';
 import Chart from 'chart.js/auto';
 import * as htmlToImage from 'html-to-image';
 import { createPaymentInvoice, checkPaymentStatus } from './payment.js';
-import { products, customers, cart, formatRupiah, addProduct, addCustomer, addTransaction, decreaseStock, addInvoice, updateInvoiceStatus, addBooking, updateBookingStatus, deleteProduct, deleteCustomer, register, login, logout, getSession, getCurrentUser, exportToCSV, transactions, canAccess, fetchTeam, upgradeToPro, bulkAddProducts } from './data.js';
+import { products, customers, cart, formatRupiah, addProduct, addCustomer, addTransaction, decreaseStock, addInvoice, updateInvoiceStatus, addBooking, updateBookingStatus, deleteProduct, deleteCustomer, register, login, logout, getSession, getCurrentUser, exportToCSV, transactions, canAccess, fetchTeam, upgradeToPro, bulkAddProducts, branding, updateBranding } from './data.js';
 import {
   renderDashboard, renderPOS, renderProducts,
   renderCustomers, renderFinance, renderBooking,
-  renderInvoices, renderReports, renderSettings, renderTeam, renderPricing
+  renderInvoices, renderReports, renderSettings, renderTeam, renderPricing,
+  renderAppearance, renderStoreProfile, renderReceiptSettings
 } from './pages.js';
 import { getWeeklyRevenue } from './data.js';
 
@@ -24,6 +25,9 @@ const pages = {
   settings:   { title: 'Pengaturan', render: renderSettings },
   team:       { title: 'Manajemen Tim', render: renderTeam },
   pricing:    { title: 'Paket Berlangganan', render: renderPricing },
+  appearance: { title: 'Tampilan', render: renderAppearance },
+  storeProfile: { title: 'Profil Toko', render: renderStoreProfile },
+  receiptSettings: { title: 'Struk & Nota', render: renderReceiptSettings },
 };
 
 let currentPage = 'dashboard';
@@ -41,6 +45,26 @@ const toastContainer = $('toast-container');
 const modalOverlay = $('modal-overlay');
 const modalContainer = $('modal-container');
 const authScreen = $('auth-screen');
+
+// ===== Branding & Theme =====
+function applyBranding() {
+  if (!branding) return;
+  
+  // Apply accent color to CSS variables
+  document.documentElement.style.setProperty('--accent', branding.accent);
+  
+  // Update store name in header and drawer if needed
+  const tenantName = $('tenant-name');
+  if (tenantName) tenantName.textContent = branding.storeName;
+  
+  const drawerStore = document.querySelector('.drawer-brand-name');
+  if (drawerStore) drawerStore.textContent = branding.storeName;
+  
+  const drawerLogo = document.querySelector('.drawer-logo');
+  if (drawerLogo && branding.storeEmoji) {
+    drawerLogo.innerHTML = `<span style="font-size:24px">${branding.storeEmoji}</span>`;
+  }
+}
 
 // ===== Navigation =====
 function navigateTo(page) {
@@ -747,6 +771,60 @@ function bindPageEvents(page) {
     }
   }
 
+  // === Branding Events ===
+  if (page === 'appearance') {
+    document.querySelectorAll('.color-picker-item').forEach(item => {
+      item.addEventListener('click', () => {
+        document.querySelectorAll('.color-picker-item').forEach(i => i.classList.remove('active'));
+        item.classList.add('active');
+        item.innerHTML = '<span class="material-icons-round" style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); color:white">check</span>';
+      });
+    });
+
+    const saveBtn = document.getElementById('btn-save-appearance');
+    if (saveBtn) saveBtn.addEventListener('click', async () => {
+      const activeColor = document.querySelector('.color-picker-item.active');
+      if (activeColor) {
+        const accent = activeColor.dataset.color;
+        await updateBranding({ accent });
+        applyBranding();
+        showToast('Tema warna berhasil diperbarui 🎨');
+        navigateTo('settings');
+      }
+    });
+  }
+
+  if (page === 'storeProfile') {
+    const saveBtn = document.getElementById('btn-save-store-profile');
+    if (saveBtn) saveBtn.addEventListener('click', async () => {
+      const storeName = document.getElementById('inp-store-name').value.trim();
+      const storeEmoji = document.getElementById('inp-store-emoji').value.trim();
+      if (!storeName) return showToast('Nama toko tidak boleh kosong', 'error');
+      
+      await updateBranding({ storeName, storeEmoji });
+      applyBranding();
+      showToast('Profil toko berhasil diperbarui ✅');
+      navigateTo('settings');
+    });
+  }
+
+  if (page === 'receiptSettings') {
+    const headerInp = document.getElementById('inp-receipt-header');
+    const footerInp = document.getElementById('inp-receipt-footer');
+    
+    headerInp.addEventListener('input', () => { $('preview-header-text').textContent = headerInp.value; });
+    footerInp.addEventListener('input', () => { $('preview-footer-text').textContent = footerInp.value; });
+
+    const saveBtn = document.getElementById('btn-save-receipt');
+    if (saveBtn) saveBtn.addEventListener('click', async () => {
+      const receiptHeader = headerInp.value.trim();
+      const receiptFooter = footerInp.value.trim();
+      await updateBranding({ receiptHeader, receiptFooter });
+      showToast('Template struk berhasil disimpan 🧾');
+      navigateTo('settings');
+    });
+  }
+
   // Initialize charts for Dashboard and Reports
   if (page === 'dashboard' || page === 'reports') {
     setTimeout(() => initCharts(page), 50);
@@ -808,10 +886,11 @@ function showReceiptModal(txn) {
   `).join('') : txn.items.map(it => `<div class="receipt-item"><span>${it}</span></div>`).join('');
 
   showModal(`
-    <div id="receipt-capture-area" style="background:var(--bg);padding:16px;border-radius:16px">
+    <div id="receipt-capture-area" style="background:var(--bg-primary);padding:16px;border-radius:16px">
       <div class="receipt">
         <div class="receipt-header">
-          <div class="receipt-store">${user.storeName}</div>
+          <div class="receipt-store" style="color:${branding.accent}">${branding.storeName}</div>
+          <div class="receipt-info">${branding.receiptHeader}</div>
           <div class="receipt-info">${txn.date}</div>
           <div class="receipt-info">TRX-${txn.id.slice(0,8).toUpperCase()}</div>
         </div>
@@ -823,8 +902,8 @@ function showReceiptModal(txn) {
           <span>${formatRupiah(txn.total)}</span>
         </div>
         <div class="receipt-footer">
-          <div class="receipt-qr" style="background:#f3f4f6;padding:10px;border-radius:8px;margin-bottom:12px;font-weight:700;color:#374151;letter-spacing:2px">POSAS VERIFIED</div>
-          <p>Terima kasih atas kunjungan Anda!</p>
+          <div class="receipt-qr" style="background:#f3f4f6;padding:10px;border-radius:8px;margin-bottom:12px;font-weight:700;color:#374151;letter-spacing:2px;border-color:${branding.accent}33">${branding.storeEmoji} POSAS VERIFIED</div>
+          <p>${branding.receiptFooter}</p>
           <p style="font-size:10px;color:var(--text-muted)">Disimpan secara aman oleh POSAS SaaS</p>
         </div>
       </div>
@@ -1042,6 +1121,7 @@ function enterApp(user) {
       }
     });
   }
+  applyBranding();
   navigateTo('dashboard');
 }
 
@@ -1077,6 +1157,7 @@ async function init() {
     
     splash.classList.add('hidden');
     enterApp(session);
+    applyBranding();
   }
 
   // Bottom nav
