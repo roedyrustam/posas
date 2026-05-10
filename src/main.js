@@ -1,6 +1,6 @@
 // ========== POSAS Main App ==========
 import './style.css';
-import { products, cart, formatRupiah } from './data.js';
+import { products, cart, formatRupiah, addProduct, addCustomer, addTransaction, decreaseStock } from './data.js';
 import {
   renderDashboard, renderPOS, renderProducts,
   renderCustomers, renderFinance, renderBooking,
@@ -151,15 +151,27 @@ function handleCheckout() {
   `);
 
   // Payment method selection
+  let selectedMethod = 'QRIS';
   setTimeout(() => {
     document.querySelectorAll('.pay-method').forEach(btn => {
       btn.addEventListener('click', () => {
         document.querySelectorAll('.pay-method').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
+        selectedMethod = btn.dataset.method === 'cash' ? 'Tunai' : 'QRIS';
       });
     });
     const confirmBtn = document.getElementById('btn-confirm-pay');
     if (confirmBtn) confirmBtn.addEventListener('click', () => {
+      // Persist transaction
+      const itemLabels = cart.items.map(i => i.qty > 1 ? `${i.name} x${i.qty}` : i.name);
+      addTransaction({
+        items: itemLabels,
+        total: cart.total,
+        customer: 'Walk-in',
+        method: selectedMethod,
+      });
+      // Decrease stock
+      decreaseStock(cart.items);
       cart.clear();
       closeModal();
       showToast('Pembayaran berhasil! 🎉');
@@ -226,26 +238,60 @@ function bindPageEvents(page) {
       showModal(`
         <div class="modal-title">Tambah Produk</div>
         <div class="input-group">
-          <label class="input-label">Nama Produk</label>
-          <input class="input" placeholder="Contoh: Kopi Susu" />
+          <label class="input-label">Nama Produk *</label>
+          <input class="input" id="inp-product-name" placeholder="Contoh: Kopi Susu" />
         </div>
         <div class="input-group">
-          <label class="input-label">Harga</label>
-          <input class="input" type="number" placeholder="Contoh: 18000" />
+          <label class="input-label">Harga (Rp) *</label>
+          <input class="input" id="inp-product-price" type="number" min="0" placeholder="Contoh: 18000" />
         </div>
         <div class="input-group">
-          <label class="input-label">Stok Awal</label>
-          <input class="input" type="number" placeholder="Contoh: 50" />
+          <label class="input-label">Stok Awal *</label>
+          <input class="input" id="inp-product-stock" type="number" min="0" placeholder="Contoh: 50" />
         </div>
         <div class="input-group">
-          <label class="input-label">Kategori</label>
-          <input class="input" placeholder="Contoh: Minuman" />
+          <label class="input-label">Kategori *</label>
+          <input class="input" id="inp-product-category" placeholder="Contoh: Minuman" />
         </div>
-        <button class="btn btn-primary btn-block mt-8" onclick="document.getElementById('modal-overlay').classList.add('hidden');document.getElementById('modal-container').classList.add('hidden')">
+        <div class="input-group">
+          <label class="input-label">Emoji (opsional)</label>
+          <input class="input" id="inp-product-emoji" placeholder="Contoh: ☕" maxlength="4" />
+        </div>
+        <div id="product-form-error" style="color:var(--danger);font-size:12px;margin-bottom:8px;display:none"></div>
+        <button class="btn btn-primary btn-block mt-8" id="btn-save-product">
           <span class="material-icons-round" style="font-size:18px">save</span>
           Simpan Produk
         </button>
       `);
+
+      setTimeout(() => {
+        const saveBtn = document.getElementById('btn-save-product');
+        if (saveBtn) saveBtn.addEventListener('click', () => {
+          const name = document.getElementById('inp-product-name').value.trim();
+          const price = document.getElementById('inp-product-price').value;
+          const stock = document.getElementById('inp-product-stock').value;
+          const category = document.getElementById('inp-product-category').value.trim();
+          const emoji = document.getElementById('inp-product-emoji').value.trim();
+          const errEl = document.getElementById('product-form-error');
+
+          // Validation
+          if (!name || !price || !stock || !category) {
+            errEl.textContent = 'Semua field bertanda * wajib diisi.';
+            errEl.style.display = 'block';
+            return;
+          }
+          if (Number(price) <= 0) {
+            errEl.textContent = 'Harga harus lebih dari 0.';
+            errEl.style.display = 'block';
+            return;
+          }
+
+          addProduct({ name, price, stock, category, emoji });
+          closeModal();
+          showToast(`${emoji || '📦'} ${name} berhasil ditambahkan`);
+          navigateTo('products');
+        });
+      }, 50);
     });
   }
 
@@ -255,22 +301,44 @@ function bindPageEvents(page) {
       showModal(`
         <div class="modal-title">Tambah Pelanggan</div>
         <div class="input-group">
-          <label class="input-label">Nama Lengkap</label>
-          <input class="input" placeholder="Contoh: Andi Pratama" />
+          <label class="input-label">Nama Lengkap *</label>
+          <input class="input" id="inp-customer-name" placeholder="Contoh: Andi Pratama" />
         </div>
         <div class="input-group">
-          <label class="input-label">No. Telepon</label>
-          <input class="input" type="tel" placeholder="Contoh: 0812-3456-7890" />
+          <label class="input-label">No. Telepon *</label>
+          <input class="input" id="inp-customer-phone" type="tel" placeholder="Contoh: 0812-3456-7890" />
         </div>
         <div class="input-group">
           <label class="input-label">Email (opsional)</label>
-          <input class="input" type="email" placeholder="Contoh: andi@email.com" />
+          <input class="input" id="inp-customer-email" type="email" placeholder="Contoh: andi@email.com" />
         </div>
-        <button class="btn btn-primary btn-block mt-8" onclick="document.getElementById('modal-overlay').classList.add('hidden');document.getElementById('modal-container').classList.add('hidden')">
+        <div id="customer-form-error" style="color:var(--danger);font-size:12px;margin-bottom:8px;display:none"></div>
+        <button class="btn btn-primary btn-block mt-8" id="btn-save-customer">
           <span class="material-icons-round" style="font-size:18px">person_add</span>
           Simpan Pelanggan
         </button>
       `);
+
+      setTimeout(() => {
+        const saveBtn = document.getElementById('btn-save-customer');
+        if (saveBtn) saveBtn.addEventListener('click', () => {
+          const name = document.getElementById('inp-customer-name').value.trim();
+          const phone = document.getElementById('inp-customer-phone').value.trim();
+          const email = document.getElementById('inp-customer-email').value.trim();
+          const errEl = document.getElementById('customer-form-error');
+
+          if (!name || !phone) {
+            errEl.textContent = 'Nama dan No. Telepon wajib diisi.';
+            errEl.style.display = 'block';
+            return;
+          }
+
+          addCustomer({ name, phone, email });
+          closeModal();
+          showToast(`👤 ${name} berhasil ditambahkan`);
+          navigateTo('customers');
+        });
+      }, 50);
     });
   }
 

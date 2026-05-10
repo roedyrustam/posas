@@ -1,9 +1,11 @@
 // ========== POSAS Page Renderers ==========
-import { products, customers, transactions, weeklyRevenue, stats, cart, formatRupiah, getInitials, hashColor } from './data.js';
+import { products, customers, transactions, getWeeklyRevenue, getStats, cart, formatRupiah, getInitials, hashColor } from './data.js';
 
 // ===== DASHBOARD =====
 export function renderDashboard() {
-  const maxRev = Math.max(...weeklyRevenue.map(d => d.amount));
+  const stats = getStats();
+  const weeklyRevenue = getWeeklyRevenue();
+  const maxRev = Math.max(...weeklyRevenue.map(d => d.amount), 1);
   return `
   <div class="fade-in">
     <div class="mb-16">
@@ -216,6 +218,7 @@ export function renderCustomers() {
 
 // ===== FINANCE =====
 export function renderFinance() {
+  const stats = getStats();
   const totalIn = transactions.reduce((s, t) => s + t.total, 0);
   return `
   <div class="fade-in">
