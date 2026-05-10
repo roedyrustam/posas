@@ -48,9 +48,9 @@ const DEFAULT_PRODUCTS = [
 ];
 
 const DEFAULT_CUSTOMERS = [
-  { id: 'c1', name: 'Andi Pratama', phone: '0812-3456-7890', email: '', totalSpent: 450000, visits: 12, lastVisit: '2026-05-10' },
-  { id: 'c2', name: 'Siti Rahayu', phone: '0813-2345-6789', email: '', totalSpent: 320000, visits: 8, lastVisit: '2026-05-09' },
-  { id: 'c3', name: 'Budi Santoso', phone: '0857-1234-5678', email: '', totalSpent: 580000, visits: 15, lastVisit: '2026-05-10' },
+  { id: 'c1', name: 'Andi Pratama', phone: '08123456789', totalSpent: 150000, visits: 5, lastVisit: '2026-05-01', points: 150, notes: 'Suka kopi pahit' },
+  { id: 'c2', name: 'Siti Aminah', phone: '08198765432', totalSpent: 85000, visits: 3, lastVisit: '2026-05-03', points: 85, notes: '' },
+  { id: 'c3', name: 'Budi Santoso', phone: '08551234567', totalSpent: 220000, visits: 8, lastVisit: '2026-05-05', points: 220, notes: 'VIP' },
   { id: 'c4', name: 'Dewi Lestari', phone: '0878-9876-5432', email: '', totalSpent: 210000, visits: 5, lastVisit: '2026-05-08' },
   { id: 'c5', name: 'Rizky Maulana', phone: '0821-6543-2109', email: '', totalSpent: 670000, visits: 20, lastVisit: '2026-05-10' },
 ];
@@ -195,6 +195,8 @@ export async function addCustomer({ name, phone, email }) {
     totalSpent: 0,
     visits: 0,
     lastVisit: new Date().toISOString().slice(0, 10),
+    points: 0,
+    notes: ''
   };
   customers.unshift(customer);
   saveJSON(KEYS.customers, customers);
@@ -258,20 +260,19 @@ export async function addTransaction({ items, total, customer, method, cartItems
     method: txn.method
   });
 
-  // Update customer stats if not walk-in
-  if (customer && customer !== 'Walk-in') {
-    const c = customers.find(cu => cu.name === customer);
+  // Update customer stats
+    const c = customers.find(cu => cu.name === txn.customer_name);
     if (c) {
       const updates = {
         totalSpent: c.totalSpent + txn.total,
         visits: c.visits + 1,
-        lastVisit: now.toISOString().slice(0, 10)
+        lastVisit: now.toISOString().slice(0, 10),
+        points: (c.points || 0) + Math.floor(txn.total / 1000)
       };
       Object.assign(c, updates);
       saveJSON(KEYS.customers, customers);
       await supabase.from('customers').update(updates).eq('id', c.id);
     }
-  }
 
   // Decrease stock
   if (cartItems) {
@@ -635,4 +636,6 @@ export function exportToCSV(filename, data) {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+}export function getLowStockProducts() {
+  return products.filter(p => (p.stock || 0) <= 10);
 }

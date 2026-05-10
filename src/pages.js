@@ -1,9 +1,10 @@
 // ========== POSAS Page Renderers ==========
-import { products, customers, transactions, invoices, bookings, getWeeklyRevenue, getStats, cart, formatRupiah, getInitials, hashColor, getCurrentUser, branding } from './data.js';
+import { products, customers, transactions, invoices, bookings, getWeeklyRevenue, getStats, cart, formatRupiah, getInitials, hashColor, getCurrentUser, branding, getLowStockProducts } from './data.js';
 
 // ===== DASHBOARD =====
 export function renderDashboard() {
   const stats = getStats();
+  const lowStock = getLowStockProducts();
   const weeklyRevenue = getWeeklyRevenue();
   const maxRev = Math.max(...weeklyRevenue.map(d => d.amount), 1);
   const user = getCurrentUser() || { name: 'Pengguna' };
@@ -15,6 +16,20 @@ export function renderDashboard() {
     <div class="mb-16">
       <p class="text-sm text-muted">Selamat ${greeting}, <strong>${user.name.split(' ')[0]}</strong> 👋</p>
     </div>
+
+    ${lowStock.length > 0 ? `
+    <div class="card mb-16" style="background:rgba(255,193,7,0.1); border:1px solid var(--warning); border-radius:16px; padding:12px 16px">
+      <div class="flex items-center gap-12">
+        <div class="flex-center" style="background:var(--warning); color:white; width:32px; height:32px; border-radius:10px">
+          <span class="material-icons-round" style="font-size:18px">warning</span>
+        </div>
+        <div class="flex-1">
+          <div class="fw-700 text-sm">Stok Hampir Habis!</div>
+          <div class="text-xs text-muted">${lowStock.length} produk butuh perhatian Anda.</div>
+        </div>
+        <button class="btn btn-sm btn-outline" style="border-radius:10px; padding:4px 10px; font-size:11px" onclick="navigateTo('products')">Lihat</button>
+      </div>
+    </div>` : ''}
 
     <div class="grid-2 mb-16">
       <div class="stat-card purple">
@@ -185,6 +200,9 @@ export function renderProducts() {
 
 // ===== CUSTOMERS =====
 export function renderCustomers() {
+  const user = getCurrentUser() || { plan: 'free' };
+  const isPro = user.plan === 'pro';
+
   return `
   <div class="fade-in">
     <div class="search-bar">
@@ -198,17 +216,21 @@ export function renderCustomers() {
 
     <div class="grid-1">
       ${customers.map(c => `
-        <div class="card flex items-center gap-12" style="padding:14px 16px">
-          <div class="list-avatar" style="background:${hashColor(c.name)};color:#fff;width:44px;height:44px;font-size:15px">${getInitials(c.name)}</div>
-          <div class="list-content">
-            <div class="list-title">${c.name}</div>
-            <div class="list-subtitle">${c.phone} · ${c.visits} kunjungan</div>
-          </div>
-          <div class="list-trailing">
-            <div class="list-amount" style="font-size:13px">${formatRupiah(c.totalSpent)}</div>
-            <div class="list-meta">Total belanja</div>
-          </div>
+      <div class="card p-12 mb-12 flex items-center gap-12 customer-item" data-id="${c.id}" style="cursor:pointer">
+        <div class="avatar-btn" style="background:${hashColor(c.name)}"><span class="avatar-text" style="color:white">${getInitials(c.name)}</span></div>
+        <div class="list-content">
+          <div class="list-title">${c.name}</div>
+          <div class="list-subtitle">${c.phone} · ${c.visits} kunjungan</div>
         </div>
+        <div class="text-right">
+          <div class="fw-700">${formatRupiah(c.totalSpent)}</div>
+          ${isPro ? `
+          <div class="flex items-center gap-4 justify-end">
+            <span class="material-icons-round text-warning" style="font-size:14px">stars</span>
+            <span class="text-xs fw-600" style="color:var(--warning)">${c.points || 0} pts</span>
+          </div>` : ''}
+        </div>
+      </div>
       `).join('')}
     </div>
 
@@ -221,9 +243,25 @@ export function renderCustomers() {
 // ===== FINANCE =====
 export function renderFinance() {
   const stats = getStats();
+  const lowStock = getLowStockProducts();
   const totalIn = transactions.reduce((s, t) => s + t.total, 0);
+
   return `
   <div class="fade-in">
+    ${lowStock.length > 0 ? `
+    <div class="card mb-16" style="background:rgba(255,193,7,0.1); border:1px solid var(--warning); border-radius:16px; padding:12px 16px">
+      <div class="flex items-center gap-12">
+        <div class="flex-center" style="background:var(--warning); color:white; width:32px; height:32px; border-radius:10px">
+          <span class="material-icons-round" style="font-size:18px">warning</span>
+        </div>
+        <div class="flex-1">
+          <div class="fw-700 text-sm">Stok Hampir Habis!</div>
+          <div class="text-xs text-muted">${lowStock.length} produk butuh perhatian Anda.</div>
+        </div>
+        <button class="btn btn-sm btn-outline" style="border-radius:10px; padding:4px 10px; font-size:11px" onclick="navigateTo('products')">Lihat</button>
+      </div>
+    </div>` : ''}
+
     <div class="grid-2 mb-16">
       <div class="stat-card green">
         <div class="stat-icon green"><span class="material-icons-round">arrow_downward</span></div>

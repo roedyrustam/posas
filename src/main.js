@@ -46,6 +46,73 @@ function showUpgradeModal(featureName) {
   `);
 }
 
+function showCustomerDetailModal(customer) {
+  const user = getCurrentUser() || { plan: 'free' };
+  const isPro = user.plan === 'pro';
+  const initials = customer.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+
+  showModal(`
+    <div class="p-4">
+      <div class="flex items-center gap-16 mb-24">
+        <div class="avatar-btn" style="width:64px;height:64px;font-size:24px;background:${hashColor(customer.name)}">
+          <span class="avatar-text" style="color:white">${initials}</span>
+        </div>
+        <div>
+          <h2 class="fw-700" style="font-size:20px">${customer.name}</h2>
+          <p class="text-muted text-sm">${customer.phone}</p>
+        </div>
+      </div>
+
+      <div class="grid-2 mb-24">
+        <div class="card p-12 text-center">
+          <div class="text-muted text-xs uppercase mb-4">Total Belanja</div>
+          <div class="fw-700">${formatRupiah(customer.totalSpent)}</div>
+        </div>
+        <div class="card p-12 text-center">
+          <div class="text-muted text-xs uppercase mb-4">Poin Loyalitas</div>
+          <div class="fw-700 text-warning flex items-center justify-center gap-4">
+            <span class="material-icons-round" style="font-size:18px">stars</span>
+            ${customer.points || 0}
+          </div>
+        </div>
+      </div>
+
+      <div class="section mb-24">
+        <div class="section-header">
+          <span class="section-title">Catatan Pelanggan</span>
+          ${isPro ? '' : '<span class="badge badge-warning">PRO</span>'}
+        </div>
+        <div class="input-group">
+          <textarea class="input" id="inp-cust-notes" rows="3" placeholder="Tambahkan catatan tentang preferensi pelanggan..." ${isPro ? '' : 'disabled'}>${customer.notes || ''}</textarea>
+          ${!isPro ? '<p class="text-xs text-muted mt-8">Upgrade ke Pro untuk menyimpan catatan pelanggan.</p>' : ''}
+        </div>
+      </div>
+
+      ${isPro ? `
+      <button class="btn btn-primary btn-block" id="btn-update-notes">
+        Simpan Catatan
+      </button>` : `
+      <button class="btn btn-primary btn-block" onclick="closeModal(); navigateTo('pricing')">
+        Upgrade Sekarang
+      </button>`}
+    </div>
+  `);
+
+  if (isPro) {
+    setTimeout(() => {
+      document.getElementById('btn-update-notes').addEventListener('click', async () => {
+        const notes = document.getElementById('inp-cust-notes').value.trim();
+        customer.notes = notes;
+        // In a real app, we'd call an updateCustomer function
+        saveJSON(KEYS.customers, customers); 
+        showToast('Catatan pelanggan berhasil disimpan ✅');
+        closeModal();
+        navigateTo('customers');
+      });
+    }, 50);
+  }
+}
+
 // Page registry
 const pages = {
   dashboard:  { title: 'Dashboard', render: renderDashboard },
@@ -482,6 +549,14 @@ function bindPageEvents(page) {
           navigateTo('customers');
         });
       }, 50);
+    });
+
+    document.querySelectorAll('.customer-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const id = item.dataset.id;
+        const customer = customers.find(c => c.id === id);
+        if (customer) showCustomerDetailModal(customer);
+      });
     });
   }
 
