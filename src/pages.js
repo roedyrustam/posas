@@ -499,6 +499,7 @@ export function renderSettings() {
           <div class="list-title">Profil Toko</div>
           <div class="list-subtitle">Nama: ${branding.storeName}</div>
         </div>
+        <span class="badge badge-warning" style="font-size:10px">PRO</span>
         <span class="material-icons-round text-muted">chevron_right</span>
       </div>
       <div class="card flex items-center gap-12 section-link" data-page="appearance" style="padding:14px 16px;cursor:pointer">
@@ -507,7 +508,7 @@ export function renderSettings() {
           <div class="list-title">Tampilan</div>
           <div class="list-subtitle">Tema dan warna aksen</div>
         </div>
-        <div style="width:12px;height:12px;border-radius:50%;background:var(--accent)"></div>
+        <span class="badge badge-warning" style="font-size:10px">PRO</span>
         <span class="material-icons-round text-muted">chevron_right</span>
       </div>
       <div class="card flex items-center gap-12 section-link" data-page="receiptSettings" style="padding:14px 16px;cursor:pointer">
@@ -516,6 +517,7 @@ export function renderSettings() {
           <div class="list-title">Struk & Nota</div>
           <div class="list-subtitle">Header, footer, dan logo</div>
         </div>
+        <span class="badge badge-warning" style="font-size:10px">PRO</span>
         <span class="material-icons-round text-muted">chevron_right</span>
       </div>
       <div class="card flex items-center gap-12" style="padding:14px 16px;cursor:pointer">

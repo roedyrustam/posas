@@ -563,7 +563,7 @@ export function canAccess(action) {
   if (!allowed.includes(action)) return false;
 
   // Plan-based restrictions
-  const proFeatures = ['reports', 'manage_staff', 'delete_data'];
+  const proFeatures = ['reports', 'manage_staff', 'delete_data', 'appearance', 'storeProfile', 'receiptSettings'];
   if (proFeatures.includes(action) && user.plan !== 'pro') {
     return false;
   }

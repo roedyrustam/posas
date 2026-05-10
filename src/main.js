@@ -12,6 +12,40 @@ import {
 } from './pages.js';
 import { getWeeklyRevenue } from './data.js';
 
+function showUpgradeModal(featureName) {
+  showModal(`
+    <div class="text-center p-20">
+      <div class="stat-icon purple mx-auto mb-20" style="width:80px;height:80px">
+        <span class="material-icons-round" style="font-size:40px;color:#a855f7">workspace_premium</span>
+      </div>
+      <h2 class="fw-700 mb-8">${featureName}</h2>
+      <p class="text-muted mb-24">Fitur ini eksklusif untuk pengguna **Paket Pro**. Tingkatkan bisnis Anda dengan fitur kustomisasi branding dan laporan mendalam.</p>
+      
+      <div class="card mb-24" style="background:var(--bg-primary);text-align:left;padding:16px">
+        <div class="flex items-center gap-12 mb-12">
+          <span class="material-icons-round text-accent" style="font-size:20px">check_circle</span>
+          <span class="text-sm">Kustomisasi Warna & Branding</span>
+        </div>
+        <div class="flex items-center gap-12 mb-12">
+          <span class="material-icons-round text-accent" style="font-size:20px">check_circle</span>
+          <span class="text-sm">Laporan Keuangan Mendalam</span>
+        </div>
+        <div class="flex items-center gap-12">
+          <span class="material-icons-round text-accent" style="font-size:20px">check_circle</span>
+          <span class="text-sm">Manajemen Staff & Multi-User</span>
+        </div>
+      </div>
+
+      <button class="btn btn-primary btn-block mb-12" onclick="closeModal(); navigateTo('pricing')">
+        Lihat Paket Pro
+      </button>
+      <button class="btn btn-ghost btn-block" onclick="closeModal()">
+        Mungkin Nanti
+      </button>
+    </div>
+  `);
+}
+
 // Page registry
 const pages = {
   dashboard:  { title: 'Dashboard', render: renderDashboard },
@@ -69,8 +103,16 @@ function applyBranding() {
 // ===== Navigation =====
 function navigateTo(page) {
   if (!pages[page]) return;
-  if (!canAccess(page) && page !== 'dashboard') {
-    showToast('Akses ditolak: Anda tidak memiliki izin untuk halaman ini ✋', 'danger');
+  
+  const user = getCurrentUser();
+  const proFeatures = ['reports', 'manage_staff', 'delete_data', 'appearance', 'storeProfile', 'receiptSettings'];
+  
+  if (!canAccess(page)) {
+    if (proFeatures.includes(page) && user && user.plan !== 'pro') {
+      showUpgradeModal(pages[page].title);
+    } else {
+      showToast('Akses ditolak: Anda tidak memiliki izin untuk halaman ini ✋', 'error');
+    }
     return;
   }
   currentPage = page;
