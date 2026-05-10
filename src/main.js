@@ -1,6 +1,6 @@
 // ========== POSAS Main App ==========
 import './style.css';
-import { products, cart, formatRupiah, addProduct, addCustomer, addTransaction, decreaseStock } from './data.js';
+import { products, customers, cart, formatRupiah, addProduct, addCustomer, addTransaction, decreaseStock, addInvoice, updateInvoiceStatus, addBooking, updateBookingStatus, deleteProduct, deleteCustomer } from './data.js';
 import {
   renderDashboard, renderPOS, renderProducts,
   renderCustomers, renderFinance, renderBooking,
@@ -346,6 +346,124 @@ function bindPageEvents(page) {
   document.querySelectorAll('.section-link[data-page]').forEach(link => {
     link.addEventListener('click', () => navigateTo(link.dataset.page));
   });
+
+  // === Booking events ===
+  if (page === 'booking') {
+    const fab = document.getElementById('btn-add-booking');
+    if (fab) fab.addEventListener('click', () => {
+      showModal(`
+        <div class="modal-title">Tambah Booking</div>
+        <div class="input-group">
+          <label class="input-label">Nama Pelanggan *</label>
+          <input class="input" id="inp-bk-name" placeholder="Contoh: Andi Pratama" />
+        </div>
+        <div class="input-group">
+          <label class="input-label">Layanan *</label>
+          <input class="input" id="inp-bk-service" placeholder="Contoh: Potong Rambut" />
+        </div>
+        <div class="input-group">
+          <label class="input-label">Tanggal *</label>
+          <input class="input" id="inp-bk-date" type="date" />
+        </div>
+        <div class="input-group">
+          <label class="input-label">Jam *</label>
+          <input class="input" id="inp-bk-time" type="time" />
+        </div>
+        <div class="input-group">
+          <label class="input-label">Catatan (opsional)</label>
+          <input class="input" id="inp-bk-notes" placeholder="Catatan tambahan" />
+        </div>
+        <div id="bk-form-error" style="color:var(--danger);font-size:12px;margin-bottom:8px;display:none"></div>
+        <button class="btn btn-primary btn-block mt-8" id="btn-save-booking">
+          <span class="material-icons-round" style="font-size:18px">event</span> Simpan Booking
+        </button>
+      `);
+      setTimeout(() => {
+        const saveBtn = document.getElementById('btn-save-booking');
+        if (saveBtn) saveBtn.addEventListener('click', () => {
+          const customerName = document.getElementById('inp-bk-name').value.trim();
+          const service = document.getElementById('inp-bk-service').value.trim();
+          const date = document.getElementById('inp-bk-date').value;
+          const time = document.getElementById('inp-bk-time').value;
+          const notes = document.getElementById('inp-bk-notes').value.trim();
+          const errEl = document.getElementById('bk-form-error');
+          if (!customerName || !service || !date || !time) {
+            errEl.textContent = 'Semua field bertanda * wajib diisi.';
+            errEl.style.display = 'block';
+            return;
+          }
+          addBooking({ customerName, service, date, time, notes });
+          closeModal();
+          showToast(`📅 Booking untuk ${customerName} berhasil`);
+          navigateTo('booking');
+        });
+      }, 50);
+    });
+    document.querySelectorAll('.btn-complete-booking').forEach(btn => {
+      btn.addEventListener('click', () => {
+        updateBookingStatus(btn.dataset.id, 'completed');
+        showToast('Booking ditandai selesai ✅');
+        navigateTo('booking');
+      });
+    });
+  }
+
+  // === Invoice events ===
+  if (page === 'invoices') {
+    const fab = document.getElementById('btn-create-invoice');
+    if (fab) fab.addEventListener('click', () => {
+      const custOptions = customers.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+      showModal(`
+        <div class="modal-title">Buat Invoice</div>
+        <div class="input-group">
+          <label class="input-label">Pelanggan *</label>
+          <select class="input" id="inp-inv-customer"><option value="">Pilih pelanggan</option>${custOptions}</select>
+        </div>
+        <div class="input-group">
+          <label class="input-label">Deskripsi Item *</label>
+          <input class="input" id="inp-inv-desc" placeholder="Contoh: Jasa Design Logo" />
+        </div>
+        <div class="input-group">
+          <label class="input-label">Total (Rp) *</label>
+          <input class="input" id="inp-inv-total" type="number" min="0" placeholder="Contoh: 500000" />
+        </div>
+        <div class="input-group">
+          <label class="input-label">Jatuh Tempo</label>
+          <input class="input" id="inp-inv-due" type="date" />
+        </div>
+        <div id="inv-form-error" style="color:var(--danger);font-size:12px;margin-bottom:8px;display:none"></div>
+        <button class="btn btn-primary btn-block mt-8" id="btn-save-invoice">
+          <span class="material-icons-round" style="font-size:18px">receipt_long</span> Buat Invoice
+        </button>
+      `);
+      setTimeout(() => {
+        const saveBtn = document.getElementById('btn-save-invoice');
+        if (saveBtn) saveBtn.addEventListener('click', () => {
+          const customer = document.getElementById('inp-inv-customer').value;
+          const desc = document.getElementById('inp-inv-desc').value.trim();
+          const total = document.getElementById('inp-inv-total').value;
+          const dueDate = document.getElementById('inp-inv-due').value;
+          const errEl = document.getElementById('inv-form-error');
+          if (!customer || !desc || !total) {
+            errEl.textContent = 'Pelanggan, Deskripsi, dan Total wajib diisi.';
+            errEl.style.display = 'block';
+            return;
+          }
+          addInvoice({ customer, items: [{ name: desc, qty: 1, price: Number(total) }], total, dueDate });
+          closeModal();
+          showToast(`🧾 Invoice untuk ${customer} berhasil dibuat`);
+          navigateTo('invoices');
+        });
+      }, 50);
+    });
+    document.querySelectorAll('.btn-inv-status').forEach(btn => {
+      btn.addEventListener('click', () => {
+        updateInvoiceStatus(btn.dataset.id, btn.dataset.status);
+        showToast(btn.dataset.status === 'paid' ? '✅ Invoice lunas!' : '📤 Invoice terkirim!');
+        navigateTo('invoices');
+      });
+    });
+  }
 }
 
 // ===== Init =====

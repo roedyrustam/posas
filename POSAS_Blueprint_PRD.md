@@ -357,14 +357,14 @@ erDiagram
 
 | Area | Gap | Priority |
 |------|-----|----------|
-| **Data Persistence** | Semua data in-memory, hilang saat refresh | 🔴 Critical |
+| ~~**Data Persistence**~~ | ~~Semua data in-memory~~ → ✅ localStorage | ~~🔴~~ ✅ Done |
 | **Authentication** | Tidak ada login/register | 🔴 Critical |
 | **Multi-tenancy** | Tenant hardcoded, tidak ada isolasi | 🔴 Critical |
-| **CRUD Operations** | Add product/customer tidak persist | 🟠 High |
-| **Form Validation** | Tidak ada validasi input | 🟠 High |
-| **Reports** | Menu saja, tidak ada data/chart | 🟡 Medium |
-| **Booking** | Empty state placeholder | 🟡 Medium |
-| **Invoice** | Empty state placeholder | 🟡 Medium |
+| ~~**CRUD Operations**~~ | ~~Add product/customer tidak persist~~ → ✅ Full CRUD | ~~🟠~~ ✅ Done |
+| ~~**Form Validation**~~ | ~~Tidak ada validasi input~~ → ✅ Required fields + error msg | ~~🟠~~ ✅ Done |
+| ~~**Reports**~~ | ~~Menu saja~~ → ✅ Analytics dashboard lengkap | ~~🟡~~ ✅ Done |
+| ~~**Booking**~~ | ~~Empty state~~ → ✅ CRUD + status management | ~~🟡~~ ✅ Done |
+| ~~**Invoice**~~ | ~~Empty state~~ → ✅ Create + status flow (Draft→Sent→Paid) | ~~🟡~~ ✅ Done |
 | **Offline Support** | Tidak ada service worker | 🟡 Medium |
 | **i18n** | Hardcoded bahasa Indonesia | 🟢 Low |
 

@@ -1,5 +1,5 @@
 // ========== POSAS Page Renderers ==========
-import { products, customers, transactions, getWeeklyRevenue, getStats, cart, formatRupiah, getInitials, hashColor } from './data.js';
+import { products, customers, transactions, invoices, bookings, getWeeklyRevenue, getStats, cart, formatRupiah, getInitials, hashColor } from './data.js';
 
 // ===== DASHBOARD =====
 export function renderDashboard() {
@@ -260,72 +260,214 @@ export function renderFinance() {
 
 // ===== BOOKING =====
 export function renderBooking() {
+  if (bookings.length === 0) {
+    return `
+    <div class="fade-in">
+      <div class="empty-state">
+        <span class="material-icons-round">calendar_month</span>
+        <h3>Belum ada booking</h3>
+        <p>Buat booking pertama untuk mengatur jadwal layanan Anda.</p>
+      </div>
+      <button class="btn-fab" id="btn-add-booking" aria-label="Tambah Booking">
+        <span class="material-icons-round">add</span>
+      </button>
+    </div>`;
+  }
+  const upcoming = bookings.filter(b => b.status === 'confirmed');
+  const past = bookings.filter(b => b.status !== 'confirmed');
   return `
   <div class="fade-in">
-    <div class="empty-state">
-      <span class="material-icons-round">calendar_month</span>
-      <h3>Belum ada booking</h3>
-      <p>Fitur booking & jadwal akan segera hadir untuk membantu mengatur layanan Anda.</p>
-      <button class="btn btn-primary">
-        <span class="material-icons-round" style="font-size:18px">notifications</span>
-        Beritahu Saya
-      </button>
-    </div>
+    ${upcoming.length > 0 ? `
+    <div class="section">
+      <div class="section-header"><span class="section-title">Akan Datang (${upcoming.length})</span></div>
+      <div class="grid-1">${upcoming.map(b => `
+        <div class="card flex items-center gap-12" style="padding:14px 16px;border-left:3px solid var(--accent)">
+          <div class="stat-icon purple"><span class="material-icons-round">event</span></div>
+          <div class="list-content">
+            <div class="list-title">${b.customerName}</div>
+            <div class="list-subtitle">${b.service} · ${b.date} ${b.time}</div>
+          </div>
+          <button class="icon-btn btn-complete-booking" data-id="${b.id}" aria-label="Selesai">
+            <span class="material-icons-round" style="color:var(--success)">check_circle</span>
+          </button>
+        </div>`).join('')}
+      </div>
+    </div>` : ''}
+    ${past.length > 0 ? `
+    <div class="section">
+      <div class="section-header"><span class="section-title">Riwayat</span></div>
+      <div class="grid-1">${past.slice(0, 10).map(b => `
+        <div class="card flex items-center gap-12" style="padding:14px 16px;opacity:0.6">
+          <div class="stat-icon green"><span class="material-icons-round">event_available</span></div>
+          <div class="list-content">
+            <div class="list-title">${b.customerName}</div>
+            <div class="list-subtitle">${b.service} · ${b.date} ${b.time}</div>
+          </div>
+          <span class="badge badge-success">${b.status === 'completed' ? 'Selesai' : 'Batal'}</span>
+        </div>`).join('')}
+      </div>
+    </div>` : ''}
+    <button class="btn-fab" id="btn-add-booking" aria-label="Tambah Booking">
+      <span class="material-icons-round">add</span>
+    </button>
   </div>`;
 }
 
 // ===== INVOICES =====
 export function renderInvoices() {
+  const statusMap = { draft: ['badge-info', 'Draft'], sent: ['badge-warning', 'Terkirim'], paid: ['badge-success', 'Lunas'] };
+  if (invoices.length === 0) {
+    return `
+    <div class="fade-in">
+      <div class="empty-state">
+        <span class="material-icons-round">receipt_long</span>
+        <h3>Belum ada invoice</h3>
+        <p>Buat invoice pertama Anda untuk menagih pelanggan secara profesional.</p>
+      </div>
+      <button class="btn-fab" id="btn-create-invoice" aria-label="Buat Invoice">
+        <span class="material-icons-round">add</span>
+      </button>
+    </div>`;
+  }
   return `
   <div class="fade-in">
-    <div class="empty-state">
-      <span class="material-icons-round">receipt_long</span>
-      <h3>Belum ada invoice</h3>
-      <p>Buat invoice pertama Anda untuk menagih pelanggan secara profesional.</p>
-      <button class="btn btn-primary" id="btn-create-invoice">
-        <span class="material-icons-round" style="font-size:18px">add</span>
-        Buat Invoice
-      </button>
+    <div class="grid-2 mb-16">
+      <div class="stat-card green">
+        <div class="stat-icon green"><span class="material-icons-round">check_circle</span></div>
+        <div class="stat-value" style="font-size:18px">${invoices.filter(i => i.status === 'paid').length}</div>
+        <div class="stat-label">Lunas</div>
+      </div>
+      <div class="stat-card orange">
+        <div class="stat-icon orange"><span class="material-icons-round">pending</span></div>
+        <div class="stat-value" style="font-size:18px">${invoices.filter(i => i.status !== 'paid').length}</div>
+        <div class="stat-label">Belum Lunas</div>
+      </div>
     </div>
+    <div class="grid-1">${invoices.map(inv => {
+      const [bc, bt] = statusMap[inv.status] || statusMap.draft;
+      return `
+      <div class="card" style="padding:14px 16px">
+        <div class="flex justify-between items-center mb-8">
+          <span class="fw-700" style="color:var(--accent-light)">${inv.number}</span>
+          <span class="badge ${bc}">${bt}</span>
+        </div>
+        <div class="list-title">${inv.customer}</div>
+        <div class="flex justify-between items-center" style="margin-top:6px">
+          <span class="list-subtitle">${inv.createdAt}</span>
+          <span class="fw-700">${formatRupiah(inv.total)}</span>
+        </div>
+        ${inv.status !== 'paid' ? `<div class="flex gap-8" style="margin-top:10px">
+          ${inv.status === 'draft' ? `<button class="btn btn-sm btn-secondary btn-inv-status" data-id="${inv.id}" data-status="sent">Kirim</button>` : ''}
+          <button class="btn btn-sm btn-primary btn-inv-status" data-id="${inv.id}" data-status="paid">Tandai Lunas</button>
+        </div>` : ''}
+      </div>`;
+    }).join('')}
+    </div>
+    <button class="btn-fab" id="btn-create-invoice" aria-label="Buat Invoice">
+      <span class="material-icons-round">add</span>
+    </button>
   </div>`;
 }
 
 // ===== REPORTS =====
 export function renderReports() {
+  const stats = getStats();
+  const weeklyRevenue = getWeeklyRevenue();
+  const maxRev = Math.max(...weeklyRevenue.map(d => d.amount), 1);
+  const methods = {};
+  transactions.forEach(t => { methods[t.method] = (methods[t.method] || 0) + t.total; });
+  const methodTotal = Object.values(methods).reduce((a, b) => a + b, 0) || 1;
+  const productCounts = {};
+  transactions.forEach(t => {
+    t.items.forEach(item => {
+      const name = item.replace(/\s*x\d+$/, '');
+      const qm = item.match(/x(\d+)$/);
+      productCounts[name] = (productCounts[name] || 0) + (qm ? parseInt(qm[1]) : 1);
+    });
+  });
+  const topProducts = Object.entries(productCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
   return `
   <div class="fade-in">
-    <div class="grid-1 mb-16">
-      <div class="card flex items-center gap-12" style="cursor:pointer">
-        <div class="stat-icon purple"><span class="material-icons-round">bar_chart</span></div>
-        <div class="list-content">
-          <div class="list-title">Laporan Penjualan</div>
-          <div class="list-subtitle">Ringkasan penjualan harian, mingguan, bulanan</div>
-        </div>
-        <span class="material-icons-round text-muted">chevron_right</span>
+    <div class="grid-2 mb-16">
+      <div class="stat-card purple">
+        <div class="stat-icon purple"><span class="material-icons-round">payments</span></div>
+        <div class="stat-value" style="font-size:16px">${formatRupiah(stats.todayRevenue)}</div>
+        <div class="stat-label">Hari Ini</div>
       </div>
-      <div class="card flex items-center gap-12" style="cursor:pointer">
-        <div class="stat-icon green"><span class="material-icons-round">inventory</span></div>
-        <div class="list-content">
-          <div class="list-title">Laporan Inventaris</div>
-          <div class="list-subtitle">Stok masuk, keluar, dan opname</div>
-        </div>
-        <span class="material-icons-round text-muted">chevron_right</span>
+      <div class="stat-card green">
+        <div class="stat-icon green"><span class="material-icons-round">trending_up</span></div>
+        <div class="stat-value" style="font-size:16px">${formatRupiah(stats.monthRevenue)}</div>
+        <div class="stat-label">Total Penjualan</div>
       </div>
-      <div class="card flex items-center gap-12" style="cursor:pointer">
-        <div class="stat-icon blue"><span class="material-icons-round">people</span></div>
-        <div class="list-content">
-          <div class="list-title">Laporan Pelanggan</div>
-          <div class="list-subtitle">Pelanggan terbaik dan analisis retensi</div>
+    </div>
+
+    <div class="section">
+      <div class="section-header"><span class="section-title">Tren Mingguan</span></div>
+      <div class="card">
+        <div class="chart-bar-container">${weeklyRevenue.map(d => `
+          <div class="chart-bar-wrap">
+            <div class="chart-bar" style="height:${(d.amount / maxRev) * 100}%"></div>
+            <span class="chart-label">${d.day}</span>
+          </div>`).join('')}
         </div>
-        <span class="material-icons-round text-muted">chevron_right</span>
       </div>
-      <div class="card flex items-center gap-12" style="cursor:pointer">
-        <div class="stat-icon orange"><span class="material-icons-round">account_balance</span></div>
-        <div class="list-content">
-          <div class="list-title">Laporan Keuangan</div>
-          <div class="list-subtitle">Laba rugi dan arus kas</div>
+    </div>
+
+    <div class="section">
+      <div class="section-header"><span class="section-title">Produk Terlaris</span></div>
+      <div class="card" style="padding:8px 16px">
+        ${topProducts.length > 0 ? topProducts.map(([name, count], i) => {
+          const p = products.find(pr => pr.name === name);
+          return `<div class="list-item">
+            <div style="font-size:24px;width:32px;text-align:center">${p ? p.emoji : '📦'}</div>
+            <div class="list-content">
+              <div class="list-title">${name}</div>
+              <div class="list-subtitle">${count} terjual</div>
+            </div>
+            <span class="badge badge-info">#${i + 1}</span>
+          </div>`;
+        }).join('') : '<div class="text-sm text-muted" style="padding:16px 0;text-align:center">Belum ada data</div>'}
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header"><span class="section-title">Metode Pembayaran</span></div>
+      <div class="card" style="padding:14px 16px">
+        ${Object.entries(methods).length > 0 ? Object.entries(methods).map(([method, amount]) => {
+          const pct = Math.round((amount / methodTotal) * 100);
+          return `<div style="margin-bottom:12px">
+            <div class="flex justify-between items-center mb-8">
+              <span class="text-sm fw-600">${method}</span>
+              <span class="text-sm text-muted">${pct}% · ${formatRupiah(amount)}</span>
+            </div>
+            <div style="height:6px;background:var(--bg-elevated);border-radius:3px;overflow:hidden">
+              <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,var(--accent),#a855f7);border-radius:3px"></div>
+            </div>
+          </div>`;
+        }).join('') : '<div class="text-sm text-muted" style="text-align:center">Belum ada data</div>'}
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header"><span class="section-title">Ringkasan</span></div>
+      <div class="grid-2">
+        <div class="card" style="text-align:center;padding:14px">
+          <div class="stat-value" style="font-size:28px;color:var(--accent-light)">${stats.totalProducts}</div>
+          <div class="stat-label">Produk</div>
         </div>
-        <span class="material-icons-round text-muted">chevron_right</span>
+        <div class="card" style="text-align:center;padding:14px">
+          <div class="stat-value" style="font-size:28px;color:var(--info)">${stats.totalCustomers}</div>
+          <div class="stat-label">Pelanggan</div>
+        </div>
+        <div class="card" style="text-align:center;padding:14px">
+          <div class="stat-value" style="font-size:28px;color:var(--success)">${transactions.length}</div>
+          <div class="stat-label">Transaksi</div>
+        </div>
+        <div class="card" style="text-align:center;padding:14px">
+          <div class="stat-value" style="font-size:28px;color:var(--warning)">${stats.lowStock}</div>
+          <div class="stat-label">Stok Menipis</div>
+        </div>
       </div>
     </div>
   </div>`;

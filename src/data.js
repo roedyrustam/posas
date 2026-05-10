@@ -6,6 +6,8 @@ const KEYS = {
   customers: 'posas_customers',
   transactions: 'posas_transactions',
   cart: 'posas_cart',
+  invoices: 'posas_invoices',
+  bookings: 'posas_bookings',
 };
 
 function loadJSON(key, fallback) {
@@ -64,10 +66,16 @@ export const products = loadJSON(KEYS.products, DEFAULT_PRODUCTS);
 export const customers = loadJSON(KEYS.customers, DEFAULT_CUSTOMERS);
 export const transactions = loadJSON(KEYS.transactions, DEFAULT_TRANSACTIONS);
 
+// --- Invoices & Bookings ---
+export const invoices = loadJSON(KEYS.invoices, []);
+export const bookings = loadJSON(KEYS.bookings, []);
+
 // Seed on first run
 if (!localStorage.getItem(KEYS.products)) saveJSON(KEYS.products, products);
 if (!localStorage.getItem(KEYS.customers)) saveJSON(KEYS.customers, customers);
 if (!localStorage.getItem(KEYS.transactions)) saveJSON(KEYS.transactions, transactions);
+if (!localStorage.getItem(KEYS.invoices)) saveJSON(KEYS.invoices, invoices);
+if (!localStorage.getItem(KEYS.bookings)) saveJSON(KEYS.bookings, bookings);
 
 // --- CRUD: Products ---
 export function addProduct({ name, price, stock, category, emoji }) {
@@ -171,6 +179,58 @@ export function decreaseStock(cartItems) {
     if (p) p.stock = Math.max(0, p.stock - ci.qty);
   });
   saveJSON(KEYS.products, products);
+}
+
+// --- CRUD: Invoices ---
+export function addInvoice({ customer, items, total, dueDate, notes }) {
+  const inv = {
+    id: 'inv' + Date.now(),
+    number: 'INV-' + String(invoices.length + 1).padStart(4, '0'),
+    customer,
+    items, // array of { name, qty, price }
+    total: Number(total),
+    dueDate: dueDate || '',
+    notes: notes || '',
+    status: 'draft', // draft, sent, paid
+    createdAt: new Date().toISOString().slice(0, 10),
+  };
+  invoices.unshift(inv);
+  saveJSON(KEYS.invoices, invoices);
+  return inv;
+}
+
+export function updateInvoiceStatus(id, status) {
+  const inv = invoices.find(i => i.id === id);
+  if (inv) { inv.status = status; saveJSON(KEYS.invoices, invoices); }
+  return inv;
+}
+
+export function deleteInvoice(id) {
+  const idx = invoices.findIndex(i => i.id === id);
+  if (idx > -1) { invoices.splice(idx, 1); saveJSON(KEYS.invoices, invoices); }
+}
+
+// --- CRUD: Bookings ---
+export function addBooking({ customerName, service, date, time, notes }) {
+  const booking = {
+    id: 'bk' + Date.now(),
+    customerName,
+    service,
+    date,
+    time,
+    notes: notes || '',
+    status: 'confirmed', // confirmed, completed, cancelled
+    createdAt: new Date().toISOString().slice(0, 10),
+  };
+  bookings.unshift(booking);
+  saveJSON(KEYS.bookings, bookings);
+  return booking;
+}
+
+export function updateBookingStatus(id, status) {
+  const bk = bookings.find(b => b.id === id);
+  if (bk) { bk.status = status; saveJSON(KEYS.bookings, bookings); }
+  return bk;
 }
 
 // --- Dynamic Stats ---
