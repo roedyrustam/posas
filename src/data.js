@@ -604,6 +604,12 @@ export async function upgradeToPro() {
   return true;
 }
 
+export function bulkAddProducts(newProducts) {
+  products.push(...newProducts);
+  saveJSON(KEYS.products, products);
+  return true;
+}
+
 export async function updateBranding(updates) {
   Object.assign(branding, updates);
   saveJSON(KEYS.branding, branding);
@@ -613,18 +619,7 @@ export async function updateBranding(updates) {
   return branding;
 }
 
-export async function fetchTeam() {
-  const user = getSession();
-  if (!user || !user.tenantId) return [];
-  
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('tenant_id', user.tenantId);
-    
-  if (error) { console.error(error); return []; }
-  return data;
-}
+// Removed duplicate fetchTeam
 
 // --- Export Utility ---
 export function exportToCSV(filename, data) {
