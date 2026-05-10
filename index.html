@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="description" content="POSAS — Platform Operasi Serbaguna untuk Semua. SaaS all-in-one untuk pengusaha pemula Indonesia." />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>POSAS — Business Management</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet" />
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Splash Screen -->
+    <div id="splash-screen" class="splash-screen">
+      <div class="splash-logo">
+        <div class="splash-icon">
+          <span class="material-icons-round">rocket_launch</span>
+        </div>
+        <h1 class="splash-title">POSAS</h1>
+        <p class="splash-subtitle">Platform Operasi Serbaguna</p>
+        <div class="splash-loader">
+          <div class="splash-loader-bar"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main App Shell -->
+    <div id="app-shell" class="app-shell hidden">
+      <!-- Top App Bar -->
+      <header id="top-bar" class="top-bar">
+        <div class="top-bar-left">
+          <button id="btn-menu" class="icon-btn" aria-label="Menu">
+            <span class="material-icons-round">menu</span>
+          </button>
+          <div class="top-bar-title">
+            <h1 id="page-title">Dashboard</h1>
+            <span id="tenant-name" class="tenant-badge">Toko Saya</span>
+          </div>
+        </div>
+        <div class="top-bar-right">
+          <button id="btn-notifications" class="icon-btn notification-btn" aria-label="Notifikasi">
+            <span class="material-icons-round">notifications</span>
+            <span class="notification-dot"></span>
+          </button>
+          <button id="btn-profile" class="avatar-btn" aria-label="Profil">
+            <span class="avatar-text">RS</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Page Container -->
+      <main id="page-container" class="page-container">
+        <!-- Pages will be rendered here -->
+      </main>
+
+      <!-- Bottom Navigation -->
+      <nav id="bottom-nav" class="bottom-nav">
+        <button class="nav-item active" data-page="dashboard" id="nav-dashboard">
+          <span class="material-icons-round nav-icon">dashboard</span>
+          <span class="nav-label">Beranda</span>
+        </button>
+        <button class="nav-item" data-page="pos" id="nav-pos">
+          <span class="material-icons-round nav-icon">point_of_sale</span>
+          <span class="nav-label">Kasir</span>
+        </button>
+        <button class="nav-item" data-page="products" id="nav-products">
+          <span class="material-icons-round nav-icon">inventory_2</span>
+          <span class="nav-label">Produk</span>
+        </button>
+        <button class="nav-item" data-page="customers" id="nav-customers">
+          <span class="material-icons-round nav-icon">people</span>
+          <span class="nav-label">Pelanggan</span>
+        </button>
+        <button class="nav-item" data-page="finance" id="nav-finance">
+          <span class="material-icons-round nav-icon">account_balance_wallet</span>
+          <span class="nav-label">Keuangan</span>
+        </button>
+      </nav>
+    </div>
+
+    <!-- Side Drawer -->
+    <div id="drawer-overlay" class="drawer-overlay hidden"></div>
+    <aside id="side-drawer" class="side-drawer">
+      <div class="drawer-header">
+        <div class="drawer-brand">
+          <div class="drawer-logo">
+            <span class="material-icons-round">rocket_launch</span>
+          </div>
+          <div>
+            <h2 class="drawer-brand-name">POSAS</h2>
+            <span class="drawer-plan-badge">Paket Gratis</span>
+          </div>
+        </div>
+      </div>
+      <div class="drawer-body">
+        <div class="drawer-section">
+          <span class="drawer-section-title">Menu Utama</span>
+          <button class="drawer-item active" data-page="dashboard">
+            <span class="material-icons-round">dashboard</span>
+            <span>Beranda</span>
+          </button>
+          <button class="drawer-item" data-page="pos">
+            <span class="material-icons-round">point_of_sale</span>
+            <span>Kasir / POS</span>
+          </button>
+          <button class="drawer-item" data-page="products">
+            <span class="material-icons-round">inventory_2</span>
+            <span>Produk & Inventaris</span>
+          </button>
+          <button class="drawer-item" data-page="customers">
+            <span class="material-icons-round">people</span>
+            <span>Pelanggan</span>
+          </button>
+          <button class="drawer-item" data-page="finance">
+            <span class="material-icons-round">account_balance_wallet</span>
+            <span>Keuangan</span>
+          </button>
+        </div>
+        <div class="drawer-section">
+          <span class="drawer-section-title">Lainnya</span>
+          <button class="drawer-item" data-page="booking">
+            <span class="material-icons-round">calendar_month</span>
+            <span>Booking & Jadwal</span>
+          </button>
+          <button class="drawer-item" data-page="invoices">
+            <span class="material-icons-round">receipt_long</span>
+            <span>Invoice</span>
+          </button>
+          <button class="drawer-item" data-page="reports">
+            <span class="material-icons-round">bar_chart</span>
+            <span>Laporan</span>
+          </button>
+          <button class="drawer-item" data-page="settings">
+            <span class="material-icons-round">settings</span>
+            <span>Pengaturan</span>
+          </button>
+        </div>
+      </div>
+      <div class="drawer-footer">
+        <div class="drawer-user">
+          <div class="avatar-btn"><span class="avatar-text">RS</span></div>
+          <div class="drawer-user-info">
+            <span class="drawer-user-name">Roedy Santosa</span>
+            <span class="drawer-user-role">Pemilik</span>
+          </div>
+          <button class="icon-btn" aria-label="Logout">
+            <span class="material-icons-round">logout</span>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Modal Container -->
+    <div id="modal-overlay" class="modal-overlay hidden"></div>
+    <div id="modal-container" class="modal-container hidden"></div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
