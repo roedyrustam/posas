@@ -2,6 +2,7 @@
 import './style.css';
 import Chart from 'chart.js/auto';
 import * as htmlToImage from 'html-to-image';
+import { createPaymentInvoice, checkPaymentStatus } from './payment.js';
 import { products, customers, cart, formatRupiah, addProduct, addCustomer, addTransaction, decreaseStock, addInvoice, updateInvoiceStatus, addBooking, updateBookingStatus, deleteProduct, deleteCustomer, register, login, logout, getSession, getCurrentUser, exportToCSV, transactions, canAccess, fetchTeam, upgradeToPro, bulkAddProducts } from './data.js';
 import {
   renderDashboard, renderPOS, renderProducts,
@@ -161,37 +162,98 @@ function handleCheckout() {
   `);
 
   // Payment method selection
-  let selectedMethod = 'QRIS';
+  let selectedMethod = 'qris';
   setTimeout(() => {
     document.querySelectorAll('.pay-method').forEach(btn => {
       btn.addEventListener('click', () => {
-        document.querySelectorAll('.pay-method').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        selectedMethod = btn.dataset.method === 'cash' ? 'Tunai' : 'QRIS';
+        document.querySelectorAll('.pay-method').forEach(b => b.classList.remove('active', 'btn-primary'));
+        btn.classList.add('active', 'btn-primary');
+        selectedMethod = btn.dataset.method;
       });
     });
+
     const confirmBtn = document.getElementById('btn-confirm-pay');
     if (confirmBtn) confirmBtn.addEventListener('click', async () => {
-      confirmBtn.disabled = true;
-      confirmBtn.innerHTML = '<span class="material-icons-round spin">sync</span> Memproses...';
-      
-      // Persist transaction
-      const itemLabels = cart.items.map(i => i.qty > 1 ? `${i.name} x${i.qty}` : i.name);
-      const txn = {
-        items: itemLabels,
-        total: cart.total,
-        customer: 'Walk-in',
-        method: selectedMethod,
-        cartItems: [...cart.items],
-        date: new Date().toLocaleString('id-ID')
-      };
-      await addTransaction(txn);
-      
-      cart.clear();
-      closeModal();
-      showReceiptModal(txn);
+      if (selectedMethod === 'qris') {
+        await handleQRISPayment(cart.total);
+      } else {
+        await completeTransaction('Cash');
+      }
     });
   }, 100);
+}
+
+async function handleQRISPayment(amount) {
+  const externalId = 'posas-' + Date.now();
+  showModal(`
+    <div class="text-center p-20">
+      <span class="material-icons-round spin mb-16" style="font-size:48px;color:var(--accent)">sync</span>
+      <h3>Menyiapkan QRIS...</h3>
+      <p class="text-muted">Menghubungkan ke payment gateway</p>
+    </div>
+  `);
+
+  const invoice = await createPaymentInvoice({
+    external_id: externalId,
+    amount: amount,
+    description: `Pembayaran di POSAS Store (${externalId})`
+  });
+
+  showModal(`
+    <div class="text-center p-20">
+      <div class="mb-16" style="background:white;padding:16px;border-radius:12px;display:inline-block">
+        <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(invoice.available_qr_codes[0].barcode_data)}" width="200" height="200" />
+      </div>
+      <h3 class="mb-4">${formatRupiah(amount)}</h3>
+      <p class="text-muted text-sm mb-20">Silakan scan QRIS di atas menggunakan aplikasi m-Banking atau E-Wallet Anda.</p>
+      
+      <div class="card p-12 mb-20 text-left" style="background:var(--bg-elevated);border-left:4px solid var(--warning)">
+        <div class="text-xs text-muted">ID TRANSAKSI</div>
+        <div class="fw-700">${externalId}</div>
+      </div>
+
+      <button class="btn btn-primary btn-block mb-12" id="btn-check-payment">
+        <span class="material-icons-round" style="font-size:18px">check_circle</span> Saya Sudah Bayar
+      </button>
+      <button class="btn btn-ghost btn-block" onclick="closeModal()">Batalkan</button>
+    </div>
+  `);
+
+  document.getElementById('btn-check-payment').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-check-payment');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-icons-round spin">sync</span> Mengecek...';
+
+    const status = await checkPaymentStatus(invoice.id);
+    if (status === 'PAID') {
+      showToast('✅ Pembayaran Berhasil Diterima!');
+      await completeTransaction('QRIS');
+    } else {
+      showToast('❌ Pembayaran belum terdeteksi. Silakan coba lagi.', 'error');
+      btn.disabled = false;
+      btn.innerHTML = '<span class="material-icons-round" style="font-size:18px">check_circle</span> Saya Sudah Bayar';
+    }
+  });
+}
+
+async function completeTransaction(paymentMethod) {
+  const itemLabels = cart.items.map(i => i.qty > 1 ? `${i.name} x${i.qty}` : i.name);
+  const txn = await addTransaction({
+    items: itemLabels,
+    total: cart.total,
+    customer: 'Walk-in',
+    paymentMethod,
+    cartItems: [...cart.items]
+  });
+
+  // Decrease stock
+  for (const item of cart.items) {
+    await decreaseStock(item.id, item.qty);
+  }
+
+  cart.clear(); // Clear cart
+  closeModal();
+  showReceiptModal(txn);
 }
 
 // ===== Page-specific event binding =====

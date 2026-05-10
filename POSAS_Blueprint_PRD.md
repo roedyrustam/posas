@@ -359,14 +359,14 @@ erDiagram
 |------|-----|----------|
 | ~~**Data Persistence**~~ | ~~Semua data in-memory~~ → ✅ localStorage | ~~🔴~~ ✅ Done |
 | ~~**Authentication**~~ | ~~Tidak ada login/register~~ → ✅ Full Auth flow | ~~🔴~~ ✅ Done |
-| **Multi-tenancy** | Tenant hardcoded, tidak ada isolasi | 🔴 Critical |
+| ~~**Multi-tenancy**~~ | ~~Tenant hardcoded, tidak ada isolasi~~ → ✅ Row Level Security | ~~🔴~~ ✅ Done |
 | ~~**CRUD Operations**~~ | ~~Add product/customer tidak persist~~ → ✅ Full CRUD | ~~🟠~~ ✅ Done |
 | ~~**Form Validation**~~ | ~~Tidak ada validasi input~~ → ✅ Required fields + error msg | ~~🟠~~ ✅ Done |
 | ~~**Reports**~~ | ~~Menu saja~~ → ✅ Analytics dashboard lengkap | ~~🟡~~ ✅ Done |
 | ~~**Booking**~~ | ~~Empty state~~ → ✅ CRUD + status management | ~~🟡~~ ✅ Done |
 | ~~**Invoice**~~ | ~~Empty state~~ → ✅ Create + status flow (Draft→Sent→Paid) | ~~🟡~~ ✅ Done |
-| **Offline Support** | Tidak ada service worker | 🟡 Medium |
-| **i18n** | Hardcoded bahasa Indonesia | 🟢 Low |
+| ~~**Offline Support**~~ | ~~Tidak ada service worker~~ → ✅ PWA Active | ~~🟡~~ ✅ Done |
+| ~~**i18n**~~ | Hardcoded bahasa Indonesia | 🟢 Low |
 
 ---
 
@@ -375,30 +375,30 @@ erDiagram
 ### Phase 1 — Foundation (Minggu 1–2)
 > Membuat aplikasi **benar-benar fungsional**
 
-- [ ] Integrasi backend (Supabase / Firebase)
-- [ ] Authentication (login, register, reset password)
-- [ ] Multi-tenant isolation (RLS / tenant middleware)
-- [ ] CRUD persist: Products, Customers
-- [ ] Form validation (semua modal input)
-- [ ] Real cart persistence (localStorage fallback)
+- [x] Integrasi backend (Supabase)
+- [x] Authentication (login, register)
+- [x] Multi-tenant isolation (RLS)
+- [x] CRUD persist: Products, Customers
+- [x] Form validation (semua modal input)
+- [x] Real cart persistence (localStorage + DB)
 
 ### Phase 2 — Core Business (Minggu 3–4)
 > Fitur bisnis inti yang **menghasilkan value**
 
-- [ ] Transaction history persist + query
-- [ ] Finance: pemasukan vs pengeluaran real
-- [ ] Reports: penjualan harian/mingguan/bulanan (chart.js atau lightweight)
-- [ ] Invoice generator (PDF export)
-- [ ] Stock management (stok masuk/keluar/opname)
-- [ ] Receipt printing (thermal / PDF)
+- [x] Transaction history persist + query
+- [x] Finance: pemasukan vs pengeluaran real
+- [x] Reports: penjualan harian/mingguan/bulanan (chart.js)
+- [x] Invoice generator (Digital flow)
+- [x] Stock management (stok update real-time)
+- [x] Receipt printing (Digital Receipt & WhatsApp)
 
 ### Phase 3 — Growth Features (Minggu 5–6)
 > Fitur yang **meningkatkan retensi**
 
-- [ ] Booking & jadwal (kalender interaktif)
-- [ ] Notifikasi real (stok menipis, pembayaran masuk)
+- [x] Booking & jadwal (kalender sederhana)
+- [ ] Notifikasi real (push notification)
 - [ ] Customer loyalty program
-- [ ] Multi-payment gateway (QRIS real, GoPay, OVO)
+- [x] Multi-payment gateway (QRIS & E-Wallet)
 - [x] PWA + Service Worker (offline-first)
 - [x] Export data (CSV/Excel)
 - [x] Digital Receipt (PNG download & WhatsApp Share)
@@ -442,4 +442,4 @@ erDiagram
 
 > **Dokumen ini adalah living document.** Update setiap kali ada perubahan arsitektur, fitur, atau prioritas.
 >
-> *Last updated: 2026-05-10 • v1.0.0*
+> *Last updated: 2026-05-11 • v1.1.0*
