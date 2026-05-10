@@ -3,12 +3,12 @@ import './style.css';
 import Chart from 'chart.js/auto';
 import * as htmlToImage from 'html-to-image';
 import { createPaymentInvoice, checkPaymentStatus } from './payment.js';
-import { products, customers, cart, formatRupiah, addProduct, addCustomer, addTransaction, decreaseStock, addInvoice, updateInvoiceStatus, addBooking, updateBookingStatus, deleteProduct, deleteCustomer, register, login, logout, getSession, getCurrentUser, exportToCSV, transactions, canAccess, fetchTeam, addStaff, removeStaff, redeemPoints, upgradeToPro, bulkAddProducts, branding, updateBranding } from './data.js';
+import { products, customers, cart, formatRupiah, addProduct, addCustomer, addTransaction, decreaseStock, addInvoice, updateInvoiceStatus, addBooking, updateBookingStatus, deleteProduct, deleteCustomer, register, login, logout, getSession, getCurrentUser, exportToCSV, transactions, canAccess, fetchTeam, addStaff, removeStaff, redeemPoints, upgradeToPro, bulkAddProducts, branding, updateBranding, logs, addLog } from './data.js';
 import {
   renderDashboard, renderPOS, renderProducts,
   renderCustomers, renderFinance, renderBooking,
   renderInvoices, renderReports, renderSettings, renderTeam, renderPricing,
-  renderAppearance, renderStoreProfile, renderReceiptSettings
+  renderAppearance, renderStoreProfile, renderReceiptSettings, renderLogs, renderInvoiceDetail
 } from './pages.js';
 import { getWeeklyRevenue } from './data.js';
 
@@ -1462,6 +1462,57 @@ async function init() {
 
   // Profile
   $('btn-profile').addEventListener('click', () => navigateTo('settings'));
+}
+
+async function showInvoiceModal(invId) {
+  const inv = invoices.find(i => i.id === invId);
+  if (!inv) return;
+
+  showModal(`
+    <div id="invoice-modal-content">
+      ${renderInvoiceDetail(invId)}
+    </div>
+    <div class="grid-2 p-16 pt-0">
+      <button class="btn btn-secondary" id="btn-download-invoice">
+        <span class="material-icons-round" style="font-size:18px">download</span> Unduh Gambar
+      </button>
+      <button class="btn btn-primary" id="btn-wa-invoice" style="background:#25D366;border-color:#25D366">
+        <span class="material-icons-round" style="font-size:18px">chat</span> WhatsApp
+      </button>
+    </div>
+  `);
+
+  setTimeout(() => {
+    document.getElementById('btn-download-invoice').addEventListener('click', async () => {
+      const btn = document.getElementById('btn-download-invoice');
+      const originalText = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="material-icons-round spin">sync</span>';
+      
+      const node = document.getElementById('invoice-capture-area');
+      try {
+        const dataUrl = await htmlToImage.toPng(node, { backgroundColor: '#ffffff', quality: 1 });
+        const link = document.createElement('a');
+        link.download = `Invoice-${inv.number}.png`;
+        link.href = dataUrl;
+        link.click();
+        addLog('Download Invoice', `Invoice ${inv.number} diunduh sebagai gambar`);
+        showToast('Invoice berhasil diunduh');
+      } catch (err) {
+        console.error(err);
+        showToast('Gagal mengunduh invoice', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+      }
+    });
+
+    document.getElementById('btn-wa-invoice').addEventListener('click', () => {
+      const msg = `Halo, berikut adalah invoice ${inv.number} Anda senilai ${formatRupiah(inv.total)}. Silakan cek di sini: [Link]`;
+      window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+      addLog('Share Invoice', `Invoice ${inv.number} dibagikan via WhatsApp`);
+    });
+  }, 100);
 }
 
 document.addEventListener('DOMContentLoaded', init);
