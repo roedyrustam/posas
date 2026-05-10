@@ -64,56 +64,92 @@ const DEFAULT_TRANSACTIONS = [
 ];
 
 // --- Load from localStorage (or seed defaults) ---
-export const products = loadJSON(KEYS.products, DEFAULT_PRODUCTS);
-export const customers = loadJSON(KEYS.customers, DEFAULT_CUSTOMERS);
-export const transactions = loadJSON(KEYS.transactions, DEFAULT_TRANSACTIONS);
+export let products = loadJSON(KEYS.products, DEFAULT_PRODUCTS);
+export let customers = loadJSON(KEYS.customers, DEFAULT_CUSTOMERS);
+export let transactions = loadJSON(KEYS.transactions, DEFAULT_TRANSACTIONS);
+export let invoices = loadJSON(KEYS.invoices, []);
+export let bookings = loadJSON(KEYS.bookings, []);
 
-// --- Invoices & Bookings ---
-export const invoices = loadJSON(KEYS.invoices, []);
-export const bookings = loadJSON(KEYS.bookings, []);
+// --- Cloud Sync ---
+export async function syncCloudData() {
+  const session = await supabase.auth.getSession();
+  const userId = session.data.session?.user?.id;
+  if (!userId) return;
 
-// Seed on first run
+  try {
+    const [p, c, t, i, b] = await Promise.all([
+      supabase.from('products').select('*').order('created_at', { ascending: false }),
+      supabase.from('customers').select('*').order('created_at', { ascending: false }),
+      supabase.from('transactions').select('*').order('created_at', { ascending: false }),
+      supabase.from('invoices').select('*').order('created_at', { ascending: false }),
+      supabase.from('bookings').select('*').order('created_at', { ascending: false }),
+    ]);
+
+    if (p.data) { products.length = 0; products.push(...p.data); saveJSON(KEYS.products, products); }
+    if (c.data) { customers.length = 0; customers.push(...c.data); saveJSON(KEYS.customers, customers); }
+    if (t.data) { transactions.length = 0; transactions.push(...t.data); saveJSON(KEYS.transactions, transactions); }
+    if (i.data) { invoices.length = 0; invoices.push(...i.data); saveJSON(KEYS.invoices, invoices); }
+    if (b.data) { bookings.length = 0; bookings.push(...b.data); saveJSON(KEYS.bookings, bookings); }
+    
+    console.log('Cloud data synced ✅');
+  } catch (err) {
+    console.error('Sync failed:', err);
+  }
+}
+
+// Seed on first run (optional, for local-first feel)
 if (!localStorage.getItem(KEYS.products)) saveJSON(KEYS.products, products);
-if (!localStorage.getItem(KEYS.customers)) saveJSON(KEYS.customers, customers);
-if (!localStorage.getItem(KEYS.transactions)) saveJSON(KEYS.transactions, transactions);
-if (!localStorage.getItem(KEYS.invoices)) saveJSON(KEYS.invoices, invoices);
-if (!localStorage.getItem(KEYS.bookings)) saveJSON(KEYS.bookings, bookings);
 
 // --- CRUD: Products ---
-export function addProduct({ name, price, stock, category, emoji }) {
+export async function addProduct({ name, price, stock, category, emoji }) {
+  const user = (await supabase.auth.getUser()).data.user;
+  if (!user) return null;
+
   const product = {
-    id: 'p' + Date.now(),
+    id: crypto.randomUUID(),
+    user_id: user.id,
     name,
     price: Number(price),
     stock: Number(stock),
     category,
     emoji: emoji || '📦',
   };
-  products.push(product);
+
+  products.unshift(product);
   saveJSON(KEYS.products, products);
+
+  await supabase.from('products').insert(product);
   return product;
 }
 
-export function updateProduct(id, updates) {
+export async function updateProduct(id, updates) {
   const idx = products.findIndex(p => p.id === id);
   if (idx === -1) return null;
   Object.assign(products[idx], updates);
   saveJSON(KEYS.products, products);
+
+  await supabase.from('products').update(updates).eq('id', id);
   return products[idx];
 }
 
-export function deleteProduct(id) {
+export async function deleteProduct(id) {
   const idx = products.findIndex(p => p.id === id);
   if (idx === -1) return false;
   products.splice(idx, 1);
   saveJSON(KEYS.products, products);
+
+  await supabase.from('products').delete().eq('id', id);
   return true;
 }
 
 // --- CRUD: Customers ---
-export function addCustomer({ name, phone, email }) {
+export async function addCustomer({ name, phone, email }) {
+  const user = (await supabase.auth.getUser()).data.user;
+  if (!user) return null;
+
   const customer = {
-    id: 'c' + Date.now(),
+    id: crypto.randomUUID(),
+    user_id: user.id,
     name,
     phone,
     email: email || '',
@@ -121,117 +157,179 @@ export function addCustomer({ name, phone, email }) {
     visits: 0,
     lastVisit: new Date().toISOString().slice(0, 10),
   };
-  customers.push(customer);
+  customers.unshift(customer);
   saveJSON(KEYS.customers, customers);
+
+  await supabase.from('customers').insert(customer);
   return customer;
 }
 
-export function updateCustomer(id, updates) {
+export async function updateCustomer(id, updates) {
   const idx = customers.findIndex(c => c.id === id);
   if (idx === -1) return null;
   Object.assign(customers[idx], updates);
   saveJSON(KEYS.customers, customers);
+
+  await supabase.from('customers').update(updates).eq('id', id);
   return customers[idx];
 }
 
-export function deleteCustomer(id) {
+export async function deleteCustomer(id) {
   const idx = customers.findIndex(c => c.id === id);
   if (idx === -1) return false;
   customers.splice(idx, 1);
   saveJSON(KEYS.customers, customers);
+
+  await supabase.from('customers').delete().eq('id', id);
   return true;
 }
 
 // --- Transactions ---
-export function addTransaction({ items, total, customer, method }) {
+export async function addTransaction({ items, total, customer, method, cartItems }) {
+  const user = (await supabase.auth.getUser()).data.user;
+  if (!user) return null;
+
   const now = new Date();
   const pad = n => String(n).padStart(2, '0');
   const dateStr = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
 
   const txn = {
-    id: 't' + Date.now(),
-    date: dateStr,
-    items,
+    id: crypto.randomUUID(),
+    user_id: user.id,
+    created_at: now.toISOString(),
+    items: JSON.stringify(items), // items as JSON string for storage
     total: Number(total),
-    customer: customer || 'Walk-in',
+    customer_name: customer || 'Walk-in',
     method: method || 'Tunai',
   };
-  transactions.unshift(txn); // newest first
+
+  // For local UI consistency
+  const localTxn = { ...txn, date: dateStr, customer: txn.customer_name, items: items };
+  transactions.unshift(localTxn);
   saveJSON(KEYS.transactions, transactions);
+
+  // Sync to Cloud
+  await supabase.from('transactions').insert({
+    id: txn.id,
+    user_id: txn.user_id,
+    items: items,
+    total: txn.total,
+    customer_name: txn.customer_name,
+    method: txn.method
+  });
 
   // Update customer stats if not walk-in
   if (customer && customer !== 'Walk-in') {
     const c = customers.find(cu => cu.name === customer);
     if (c) {
-      c.totalSpent += txn.total;
-      c.visits += 1;
-      c.lastVisit = now.toISOString().slice(0, 10);
+      const updates = {
+        totalSpent: c.totalSpent + txn.total,
+        visits: c.visits + 1,
+        lastVisit: now.toISOString().slice(0, 10)
+      };
+      Object.assign(c, updates);
       saveJSON(KEYS.customers, customers);
+      await supabase.from('customers').update(updates).eq('id', c.id);
     }
   }
 
   // Decrease stock
-  // (items is an array of strings like "Kopi Susu x2" — we use cart items instead)
-  return txn;
+  if (cartItems) {
+    await decreaseStock(cartItems);
+  }
+
+  return localTxn;
 }
 
-export function decreaseStock(cartItems) {
-  cartItems.forEach(ci => {
+export async function decreaseStock(cartItems) {
+  for (const ci of cartItems) {
     const p = products.find(pr => pr.id === ci.id);
-    if (p) p.stock = Math.max(0, p.stock - ci.qty);
-  });
+    if (p) {
+      const newStock = Math.max(0, p.stock - ci.qty);
+      p.stock = newStock;
+      await supabase.from('products').update({ stock: newStock }).eq('id', p.id);
+    }
+  }
   saveJSON(KEYS.products, products);
 }
 
 // --- CRUD: Invoices ---
-export function addInvoice({ customer, items, total, dueDate, notes }) {
+export async function addInvoice({ customer, items, total, dueDate, notes }) {
+  const user = (await supabase.auth.getUser()).data.user;
+  if (!user) return null;
+
   const inv = {
-    id: 'inv' + Date.now(),
-    number: 'INV-' + String(invoices.length + 1).padStart(4, '0'),
-    customer,
-    items, // array of { name, qty, price }
+    id: crypto.randomUUID(),
+    user_id: user.id,
+    invoice_number: 'INV-' + String(invoices.length + 1).padStart(4, '0'),
+    customer_name: customer,
+    items: items, // array of { name, qty, price }
     total: Number(total),
-    dueDate: dueDate || '',
+    due_date: dueDate || null,
     notes: notes || '',
     status: 'draft', // draft, sent, paid
-    createdAt: new Date().toISOString().slice(0, 10),
+    created_at: new Date().toISOString(),
   };
-  invoices.unshift(inv);
+
+  const localInv = { ...inv, number: inv.invoice_number, customer: inv.customer_name, dueDate: inv.due_date, createdAt: inv.created_at.slice(0, 10) };
+  invoices.unshift(localInv);
   saveJSON(KEYS.invoices, invoices);
-  return inv;
+
+  await supabase.from('invoices').insert(inv);
+  return localInv;
 }
 
-export function updateInvoiceStatus(id, status) {
+export async function updateInvoiceStatus(id, status) {
   const inv = invoices.find(i => i.id === id);
-  if (inv) { inv.status = status; saveJSON(KEYS.invoices, invoices); }
+  if (inv) { 
+    inv.status = status; 
+    saveJSON(KEYS.invoices, invoices); 
+    await supabase.from('invoices').update({ status }).eq('id', id);
+  }
   return inv;
 }
 
-export function deleteInvoice(id) {
+export async function deleteInvoice(id) {
   const idx = invoices.findIndex(i => i.id === id);
-  if (idx > -1) { invoices.splice(idx, 1); saveJSON(KEYS.invoices, invoices); }
+  if (idx > -1) { 
+    invoices.splice(idx, 1); 
+    saveJSON(KEYS.invoices, invoices); 
+    await supabase.from('invoices').delete().eq('id', id);
+  }
 }
 
 // --- CRUD: Bookings ---
-export function addBooking({ customerName, service, date, time, notes }) {
+export async function addBooking({ customerName, service, date, time, notes }) {
+  const user = (await supabase.auth.getUser()).data.user;
+  if (!user) return null;
+
   const booking = {
-    id: 'bk' + Date.now(),
-    customerName,
+    id: crypto.randomUUID(),
+    user_id: user.id,
+    customer_name: customerName,
     service,
     date,
     time,
     notes: notes || '',
     status: 'confirmed', // confirmed, completed, cancelled
-    createdAt: new Date().toISOString().slice(0, 10),
+    created_at: new Date().toISOString(),
   };
-  bookings.unshift(booking);
+
+  const localBk = { ...booking, customerName: booking.customer_name, createdAt: booking.created_at.slice(0, 10) };
+  bookings.unshift(localBk);
   saveJSON(KEYS.bookings, bookings);
-  return booking;
+
+  await supabase.from('bookings').insert(booking);
+  return localBk;
 }
 
-export function updateBookingStatus(id, status) {
+export async function updateBookingStatus(id, status) {
   const bk = bookings.find(b => b.id === id);
-  if (bk) { bk.status = status; saveJSON(KEYS.bookings, bookings); }
+  if (bk) { 
+    bk.status = status; 
+    saveJSON(KEYS.bookings, bookings); 
+    await supabase.from('bookings').update({ status }).eq('id', id);
+  }
   return bk;
 }
 

@@ -162,17 +162,20 @@ function handleCheckout() {
       });
     });
     const confirmBtn = document.getElementById('btn-confirm-pay');
-    if (confirmBtn) confirmBtn.addEventListener('click', () => {
+    if (confirmBtn) confirmBtn.addEventListener('click', async () => {
+      confirmBtn.disabled = true;
+      confirmBtn.innerHTML = '<span class="material-icons-round spin">sync</span> Memproses...';
+      
       // Persist transaction
       const itemLabels = cart.items.map(i => i.qty > 1 ? `${i.name} x${i.qty}` : i.name);
-      addTransaction({
+      await addTransaction({
         items: itemLabels,
         total: cart.total,
         customer: 'Walk-in',
         method: selectedMethod,
+        cartItems: cart.items
       });
-      // Decrease stock
-      decreaseStock(cart.items);
+      
       cart.clear();
       closeModal();
       showToast('Pembayaran berhasil! 🎉');
@@ -267,7 +270,7 @@ function bindPageEvents(page) {
 
       setTimeout(() => {
         const saveBtn = document.getElementById('btn-save-product');
-        if (saveBtn) saveBtn.addEventListener('click', () => {
+        if (saveBtn) saveBtn.addEventListener('click', async () => {
           const name = document.getElementById('inp-product-name').value.trim();
           const price = document.getElementById('inp-product-price').value;
           const stock = document.getElementById('inp-product-stock').value;
@@ -281,13 +284,11 @@ function bindPageEvents(page) {
             errEl.style.display = 'block';
             return;
           }
-          if (Number(price) <= 0) {
-            errEl.textContent = 'Harga harus lebih dari 0.';
-            errEl.style.display = 'block';
-            return;
-          }
+          
+          saveBtn.disabled = true;
+          saveBtn.innerHTML = '<span class="material-icons-round spin">sync</span> Menyimpan...';
 
-          addProduct({ name, price, stock, category, emoji });
+          await addProduct({ name, price, stock, category, emoji });
           closeModal();
           showToast(`${emoji || '📦'} ${name} berhasil ditambahkan`);
           navigateTo('products');
@@ -322,7 +323,7 @@ function bindPageEvents(page) {
 
       setTimeout(() => {
         const saveBtn = document.getElementById('btn-save-customer');
-        if (saveBtn) saveBtn.addEventListener('click', () => {
+        if (saveBtn) saveBtn.addEventListener('click', async () => {
           const name = document.getElementById('inp-customer-name').value.trim();
           const phone = document.getElementById('inp-customer-phone').value.trim();
           const email = document.getElementById('inp-customer-email').value.trim();
@@ -334,7 +335,10 @@ function bindPageEvents(page) {
             return;
           }
 
-          addCustomer({ name, phone, email });
+          saveBtn.disabled = true;
+          saveBtn.innerHTML = '<span class="material-icons-round spin">sync</span> Menyimpan...';
+
+          await addCustomer({ name, phone, email });
           closeModal();
           showToast(`👤 ${name} berhasil ditambahkan`);
           navigateTo('customers');
@@ -381,7 +385,7 @@ function bindPageEvents(page) {
       `);
       setTimeout(() => {
         const saveBtn = document.getElementById('btn-save-booking');
-        if (saveBtn) saveBtn.addEventListener('click', () => {
+        if (saveBtn) saveBtn.addEventListener('click', async () => {
           const customerName = document.getElementById('inp-bk-name').value.trim();
           const service = document.getElementById('inp-bk-service').value.trim();
           const date = document.getElementById('inp-bk-date').value;
@@ -393,7 +397,11 @@ function bindPageEvents(page) {
             errEl.style.display = 'block';
             return;
           }
-          addBooking({ customerName, service, date, time, notes });
+
+          saveBtn.disabled = true;
+          saveBtn.innerHTML = '<span class="material-icons-round spin">sync</span> Menyimpan...';
+
+          await addBooking({ customerName, service, date, time, notes });
           closeModal();
           showToast(`📅 Booking untuk ${customerName} berhasil`);
           navigateTo('booking');
@@ -401,8 +409,9 @@ function bindPageEvents(page) {
       }, 50);
     });
     document.querySelectorAll('.btn-complete-booking').forEach(btn => {
-      btn.addEventListener('click', () => {
-        updateBookingStatus(btn.dataset.id, 'completed');
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        await updateBookingStatus(btn.dataset.id, 'completed');
         showToast('Booking ditandai selesai ✅');
         navigateTo('booking');
       });
@@ -439,7 +448,7 @@ function bindPageEvents(page) {
       `);
       setTimeout(() => {
         const saveBtn = document.getElementById('btn-save-invoice');
-        if (saveBtn) saveBtn.addEventListener('click', () => {
+        if (saveBtn) saveBtn.addEventListener('click', async () => {
           const customer = document.getElementById('inp-inv-customer').value;
           const desc = document.getElementById('inp-inv-desc').value.trim();
           const total = document.getElementById('inp-inv-total').value;
@@ -450,7 +459,11 @@ function bindPageEvents(page) {
             errEl.style.display = 'block';
             return;
           }
-          addInvoice({ customer, items: [{ name: desc, qty: 1, price: Number(total) }], total, dueDate });
+
+          saveBtn.disabled = true;
+          saveBtn.innerHTML = '<span class="material-icons-round spin">sync</span> Membuat...';
+
+          await addInvoice({ customer, items: [{ name: desc, qty: 1, price: Number(total) }], total, dueDate });
           closeModal();
           showToast(`🧾 Invoice untuk ${customer} berhasil dibuat`);
           navigateTo('invoices');
@@ -458,8 +471,9 @@ function bindPageEvents(page) {
       }, 50);
     });
     document.querySelectorAll('.btn-inv-status').forEach(btn => {
-      btn.addEventListener('click', () => {
-        updateInvoiceStatus(btn.dataset.id, btn.dataset.status);
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        await updateInvoiceStatus(btn.dataset.id, btn.dataset.status);
         showToast(btn.dataset.status === 'paid' ? '✅ Invoice lunas!' : '📤 Invoice terkirim!');
         navigateTo('invoices');
       });
@@ -626,7 +640,9 @@ async function handleLogout() {
 }
 
 // ===== Init =====
-function init() {
+import { syncCloudData } from './data.js';
+
+async function init() {
   const session = getSession();
 
   if (!session) {
@@ -634,11 +650,15 @@ function init() {
     splash.classList.add('hidden');
     showAuthScreen('login');
   } else {
-    // Has session → splash then app
-    setTimeout(() => {
-      splash.classList.add('hidden');
-      enterApp(session);
-    }, 2200);
+    // Has session → sync data then enter app
+    try {
+      await syncCloudData();
+    } catch (e) {
+      console.warn('Initial sync failed, using cache');
+    }
+    
+    splash.classList.add('hidden');
+    enterApp(session);
   }
 
   // Bottom nav
