@@ -432,8 +432,8 @@ export function renderInvoices() {
   </div>`;
 }
 
-// ===== REPORTS =====
-export function renderReports() {
+// ===== REPORTS (OLD) =====
+function renderReportsOld() {
   const stats = getStats();
   const weeklyRevenue = getWeeklyRevenue();
   const maxRev = Math.max(...weeklyRevenue.map(d => d.amount), 1);

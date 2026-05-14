@@ -565,9 +565,9 @@ export function canAccess(action) {
   if (!user) return false;
   
   const permissions = {
-    'owner': ['pos', 'products', 'customers', 'finance', 'reports', 'booking', 'invoices', 'settings', 'manage_staff', 'delete_data', 'appearance', 'storeProfile', 'receiptSettings', 'team', 'loyalty'],
-    'kasir': ['pos', 'customers', 'booking', 'settings', 'appearance', 'storeProfile', 'receiptSettings'],
-    'manajer': ['pos', 'products', 'customers', 'booking', 'invoices', 'settings', 'reports', 'appearance', 'storeProfile', 'receiptSettings', 'loyalty']
+    'owner': ['dashboard', 'pos', 'products', 'customers', 'finance', 'reports', 'booking', 'invoices', 'settings', 'manage_staff', 'delete_data', 'appearance', 'storeProfile', 'receiptSettings', 'team', 'loyalty', 'logs'],
+    'kasir': ['dashboard', 'pos', 'customers', 'booking', 'settings', 'appearance', 'storeProfile', 'receiptSettings'],
+    'manajer': ['dashboard', 'pos', 'products', 'customers', 'booking', 'invoices', 'settings', 'reports', 'appearance', 'storeProfile', 'receiptSettings', 'loyalty', 'logs']
   };
   
   const allowed = permissions[user.role.toLowerCase()] || [];
@@ -604,7 +604,7 @@ export async function upgradeToPro() {
   return true;
 }
 
-export function bulkAddProducts(newProducts) {
+function bulkAddProductsOld(newProducts) {
   products.push(...newProducts);
   saveJSON(KEYS.products, products);
   return true;
@@ -641,7 +641,9 @@ export function exportToCSV(filename, data) {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-}export function getLowStockProducts() {
+}
+
+export function getLowStockProducts() {
   return products.filter(p => (p.stock || 0) <= 10);
 }
 
