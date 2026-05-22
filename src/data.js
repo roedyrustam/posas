@@ -66,9 +66,10 @@ const DEFAULT_TRANSACTIONS = [
   { id: 't6', date: '2026-05-09 16:30', items: ['Brownies x4', 'Kopi Susu'], total: 66000, customer: 'Walk-in', method: 'QRIS' },
 ];
 const DEFAULT_STAFF = [
-  { id: 's1', name: 'Roedy Santosa', email: 'roedy@posas.id', role: 'Owner', status: 'Active' },
-  { id: 's2', name: 'Bambang Kasir', email: 'bambang@gmail.com', role: 'Kasir', status: 'Active' },
-  { id: 's3', name: 'Maya Manager', email: 'maya@posas.id', role: 'Manajer', status: 'Active' },
+  { id: 's0', name: 'Admin Utama', email: 'admin@posas.id', role: 'Owner', status: 'Active', password: 'password123' },
+  { id: 's1', name: 'Roedy Santosa', email: 'roedy@posas.id', role: 'Owner', status: 'Active', password: 'password123' },
+  { id: 's2', name: 'Bambang Kasir', email: 'bambang@gmail.com', role: 'Kasir', status: 'Active', password: 'password123' },
+  { id: 's3', name: 'Maya Manager', email: 'maya@posas.id', role: 'Manajer', status: 'Active', password: 'password123' },
 ];
 
 // --- Load from localStorage (or seed defaults) ---
