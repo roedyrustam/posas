@@ -536,6 +536,66 @@ function renderReportsOld() {
   </div>`;
 }
 
+// ===== PRICING =====
+export function renderPricing() {
+  const user = getCurrentUser() || { plan: 'free' };
+  const isPro = user.plan === 'pro';
+
+  return `
+  <div class="fade-in">
+    <div class="text-center mb-24 mt-16">
+      <h2 class="fw-800" style="font-size:24px">Tingkatkan Bisnis Anda 🚀</h2>
+      <p class="text-muted text-sm mt-8">Pilih paket yang sesuai untuk mengembangkan toko Anda tanpa batas.</p>
+    </div>
+
+    <div class="grid-1 gap-16">
+      <!-- FREE TIER -->
+      <div class="card p-24" style="border: ${!isPro ? '2px solid var(--accent)' : '1px solid var(--border)'}">
+        <div class="flex justify-between items-start mb-16">
+          <div>
+            <h3 class="fw-700 text-lg">Gratis</h3>
+            <div class="text-xs text-muted">Selamanya</div>
+          </div>
+          ${!isPro ? '<span class="badge badge-success">Paket Saat Ini</span>' : ''}
+        </div>
+        <div class="fw-800 mb-16" style="font-size:28px">Rp 0</div>
+        
+        <div class="space-y-12 mb-24">
+          <div class="flex items-center gap-8 text-sm"><span class="material-icons-round text-success" style="font-size:16px">check_circle</span> Maksimal 50 Produk</div>
+          <div class="flex items-center gap-8 text-sm"><span class="material-icons-round text-success" style="font-size:16px">check_circle</span> Kasir (POS) Dasar</div>
+          <div class="flex items-center gap-8 text-sm"><span class="material-icons-round text-muted" style="font-size:16px">cancel</span> Laporan Lanjutan & VIP</div>
+          <div class="flex items-center gap-8 text-sm"><span class="material-icons-round text-muted" style="font-size:16px">cancel</span> Manajemen Karyawan</div>
+          <div class="flex items-center gap-8 text-sm"><span class="material-icons-round text-muted" style="font-size:16px">cancel</span> Multi-Outlet</div>
+        </div>
+      </div>
+
+      <!-- PRO TIER -->
+      <div class="card p-24" style="background:var(--bg-elevated); border: ${isPro ? '2px solid var(--accent)' : '1px solid var(--border)'}; box-shadow: 0 8px 24px rgba(99,102,241,0.15)">
+        <div class="flex justify-between items-start mb-16">
+          <div>
+            <h3 class="fw-700 text-lg">Pro</h3>
+            <div class="text-xs text-muted">Untuk bisnis yang berkembang</div>
+          </div>
+          ${isPro ? '<span class="badge badge-success">Paket Saat Ini</span>' : '<span class="badge badge-warning" style="background:#eab308;color:white">Paling Populer</span>'}
+        </div>
+        <div class="fw-800 mb-16" style="font-size:28px">Rp 99rb<span class="text-sm fw-400 text-muted">/bln</span></div>
+        
+        <div class="space-y-12 mb-24">
+          <div class="flex items-center gap-8 text-sm"><span class="material-icons-round text-success" style="font-size:16px">check_circle</span> <b>Unlimited</b> Produk</div>
+          <div class="flex items-center gap-8 text-sm"><span class="material-icons-round text-success" style="font-size:16px">check_circle</span> Analitik & Laporan Lengkap</div>
+          <div class="flex items-center gap-8 text-sm"><span class="material-icons-round text-success" style="font-size:16px">check_circle</span> Manajemen Karyawan & Hak Akses</div>
+          <div class="flex items-center gap-8 text-sm"><span class="material-icons-round text-success" style="font-size:16px">check_circle</span> Manajemen Multi-Outlet</div>
+          <div class="flex items-center gap-8 text-sm"><span class="material-icons-round text-success" style="font-size:16px">check_circle</span> Program Loyalitas Premium</div>
+        </div>
+
+        <button class="btn btn-primary btn-block" id="btn-upgrade-pro" ${isPro ? 'disabled' : ''}>
+          ${isPro ? 'Sudah Aktif' : 'Upgrade Sekarang 🚀'}
+        </button>
+      </div>
+    </div>
+  </div>`;
+}
+
 // ===== SETTINGS =====
 export function renderSettings() {
   const user = getCurrentUser() || { name: 'Pengguna', email: '', storeName: 'Toko Saya', plan: 'free' };

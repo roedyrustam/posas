@@ -14,38 +14,46 @@ import { getWeeklyRevenue } from './data.js';
 
 let selectedPOSCustomer = null;
 
-function showUpgradeModal(featureName) {
+function showUpgradeModal(reason) {
   showModal(`
-    <div class="text-center p-20">
-      <div class="stat-icon purple mx-auto mb-20" style="width:80px;height:80px">
-        <span class="material-icons-round" style="font-size:40px;color:#a855f7">workspace_premium</span>
-      </div>
-      <h2 class="fw-700 mb-8">${featureName}</h2>
-      <p class="text-muted mb-24">Fitur ini eksklusif untuk pengguna **Paket Pro**. Tingkatkan bisnis Anda dengan fitur kustomisasi branding dan laporan mendalam.</p>
+    <div class="text-center p-16">
+      <span class="material-icons-round text-warning mb-12" style="font-size:48px">workspace_premium</span>
+      <h3 class="fw-800 mb-8">Upgrade ke Pro</h3>
+      <p class="text-sm text-muted mb-24">${reason || 'Fitur ini eksklusif untuk pengguna Pro.'}</p>
       
-      <div class="card mb-24" style="background:var(--bg-primary);text-align:left;padding:16px">
-        <div class="flex items-center gap-12 mb-12">
-          <span class="material-icons-round text-accent" style="font-size:20px">check_circle</span>
-          <span class="text-sm">Kustomisasi Warna & Branding</span>
-        </div>
-        <div class="flex items-center gap-12 mb-12">
-          <span class="material-icons-round text-accent" style="font-size:20px">check_circle</span>
-          <span class="text-sm">Laporan Keuangan Mendalam</span>
-        </div>
-        <div class="flex items-center gap-12">
-          <span class="material-icons-round text-accent" style="font-size:20px">check_circle</span>
-          <span class="text-sm">Manajemen Staff & Multi-User</span>
-        </div>
+      <div class="card p-16 mb-24" style="background:#f8fafc">
+        <div class="fw-700 mb-8">Pindai QRIS untuk Bayar</div>
+        <!-- Simulasi QR Code -->
+        <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=POSAS_UPGRADE_PRO" alt="QRIS" style="width:200px; height:200px; margin:0 auto; border-radius:12px; border:2px solid var(--border)">
+        <div class="text-xs text-muted mt-8">Invoice: INV-${Date.now()}</div>
       </div>
 
-      <button class="btn btn-primary btn-block mb-12" onclick="closeModal(); navigateTo('pricing')">
-        Lihat Paket Pro
+      <button class="btn btn-primary btn-block mb-12" id="btn-confirm-payment">
+        <span class="material-icons-round" style="font-size:18px">check_circle</span>
+        Saya Sudah Bayar
       </button>
-      <button class="btn btn-ghost btn-block" onclick="closeModal()">
-        Mungkin Nanti
-      </button>
+      <button class="btn btn-secondary btn-block" onclick="closeModal()">Nanti Saja</button>
     </div>
   `);
+
+  setTimeout(() => {
+    const confirmBtn = document.getElementById('btn-confirm-payment');
+    if (confirmBtn) {
+      confirmBtn.addEventListener('click', async () => {
+        confirmBtn.disabled = true;
+        confirmBtn.innerHTML = '<span class="material-icons-round spin">sync</span> Memverifikasi...';
+        
+        // Simulasi proses verifikasi ke Payment Gateway (2 detik)
+        setTimeout(async () => {
+          await upgradeToPro();
+          closeModal();
+          showToast('Selamat! Akun Anda telah menjadi Pro 🚀', 'success');
+          // Reload page to apply changes
+          setTimeout(() => window.location.reload(), 1500);
+        }, 2000);
+      });
+    }
+  }, 100);
 }
 
 function showCustomerDetailModal(customer) {
@@ -515,6 +523,16 @@ async function completeTransaction(paymentMethod, overriddenTotal) {
 
 // ===== Page-specific event binding =====
 function bindPageEvents(page) {
+  
+  if (page === 'pricing') {
+    const btnUpgrade = document.getElementById('btn-upgrade-pro');
+    if (btnUpgrade) {
+      btnUpgrade.addEventListener('click', () => {
+        showUpgradeModal('Paket Pro - Rp 99.000/bulan');
+      });
+    }
+  }
+
   if (page === 'pos') {
     // Product tap to add
     document.querySelectorAll('.pos-product').forEach(el => {
@@ -662,7 +680,13 @@ function bindPageEvents(page) {
           saveBtn.disabled = true;
           saveBtn.innerHTML = '<span class="material-icons-round spin">sync</span> Menyimpan...';
 
-          await addProduct({ name, price, stock, category, emoji });
+          const res = await addProduct({ name, price, stock, category, emoji });
+          if (res && res.error === 'LIMIT_REACHED') {
+            closeModal();
+            showUpgradeModal('Batas Maksimal Produk (50)');
+            return;
+          }
+          
           closeModal();
           showToast(`${emoji || '📦'} ${name} berhasil ditambahkan`);
           navigateTo('products');
