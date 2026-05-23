@@ -18,24 +18,60 @@ const KEYS = {
   activeOutlet: 'posas_active_outlet'
 };
 
-function loadJSON(key, fallback) {
+// Low level direct localStorage reads (bypasses tenant prefix, used to load session)
+function loadJSONDirect(key, fallback) {
   try {
     const raw = localStorage.getItem(key);
     return raw ? JSON.parse(raw) : fallback;
   } catch { return fallback; }
 }
 
-function saveJSON(key, data) {
-  localStorage.setItem(key, JSON.stringify(data));
+export function getCurrentTenant() {
+  const session = loadJSONDirect(KEYS.session, null);
+  if (session) {
+    return {
+      id: session.tenantId || 'tn_001',
+      name: session.storeName || 'Toko Saya',
+      owner: session.name || 'Pemilik',
+      plan: session.plan || 'free',
+      createdAt: session.createdAt || '2026-01-15'
+    };
+  }
+  return {
+    id: 'tn_001',
+    name: 'Toko Saya',
+    owner: 'Roedy Santosa',
+    plan: 'free',
+    createdAt: '2026-01-15'
+  };
 }
 
-// --- Tenant (static for now) ---
+function getTenantKey(key) {
+  if (key === KEYS.session || key === KEYS.users) return key;
+  const tenant = getCurrentTenant();
+  return `${tenant.id}_${key}`;
+}
+
+function loadJSON(key, fallback) {
+  try {
+    const tenantKey = getTenantKey(key);
+    const raw = localStorage.getItem(tenantKey);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch { return fallback; }
+}
+
+function saveJSON(key, data) {
+  const tenantKey = getTenantKey(key);
+  localStorage.setItem(tenantKey, JSON.stringify(data));
+}
+
+// --- Tenant Dynamic Proxy ---
 export const tenant = {
-  id: 'tn_001',
-  name: 'Toko Saya',
-  owner: 'Roedy Santosa',
-  plan: 'free',
-  createdAt: '2026-01-15'
+  get id() { return getCurrentTenant().id; },
+  get name() { return getCurrentTenant().name; },
+  get owner() { return getCurrentTenant().owner; },
+  get plan() { return getCurrentTenant().plan; },
+  get createdAt() { return getCurrentTenant().createdAt; }
 };
 
 // --- Default Seed Data ---
@@ -81,16 +117,17 @@ const DEFAULT_OUTLETS = [
 ];
 
 // --- Load from localStorage (or seed defaults) ---
-export let products = loadJSON(KEYS.products, DEFAULT_PRODUCTS);
-export let customers = loadJSON(KEYS.customers, DEFAULT_CUSTOMERS);
-export let transactions = loadJSON(KEYS.transactions, DEFAULT_TRANSACTIONS);
-export let invoices = loadJSON(KEYS.invoices, []);
-export let bookings = loadJSON(KEYS.bookings, []);
-export let staff = loadJSON(KEYS.staff, DEFAULT_STAFF);
-export let logs = loadJSON(KEYS.logs, []);
-export let outlets = loadJSON(KEYS.outlets, DEFAULT_OUTLETS);
-export let activeOutlet = loadJSON(KEYS.activeOutlet, DEFAULT_OUTLETS[0].id);
-export let notifications = loadJSON(KEYS.notifications, []);
+// --- Load from localStorage (or seed defaults) ---
+export let products = [];
+export let customers = [];
+export let transactions = [];
+export let invoices = [];
+export let bookings = [];
+export let staff = [];
+export let logs = [];
+export let outlets = [];
+export let activeOutlet = '';
+export let notifications = [];
 
 // --- Branding (Appearance & Store Info) ---
 const DEFAULT_BRANDING = {
@@ -101,7 +138,82 @@ const DEFAULT_BRANDING = {
   receiptFooter: 'Silakan berkunjung kembali.',
   theme: 'dark' // currently only dark is fully supported by CSS
 };
-export let branding = loadJSON(KEYS.branding, DEFAULT_BRANDING);
+export let branding = { ...DEFAULT_BRANDING };
+
+// --- Initialize dynamic tenant arrays and namespace seeding ---
+export function initializeTenantData() {
+  const currentT = getCurrentTenant();
+  
+  // If namespace is completely empty, perform initial seeding for this new tenant!
+  const tenantKey = getTenantKey(KEYS.products);
+  if (!localStorage.getItem(tenantKey)) {
+    saveJSON(KEYS.products, DEFAULT_PRODUCTS);
+    saveJSON(KEYS.customers, DEFAULT_CUSTOMERS);
+    saveJSON(KEYS.transactions, DEFAULT_TRANSACTIONS);
+    saveJSON(KEYS.staff, DEFAULT_STAFF);
+    saveJSON(KEYS.outlets, DEFAULT_OUTLETS);
+    saveJSON(KEYS.activeOutlet, DEFAULT_OUTLETS[0].id);
+    saveJSON(KEYS.notifications, []);
+    saveJSON(KEYS.invoices, []);
+    saveJSON(KEYS.bookings, []);
+    saveJSON(KEYS.branding, {
+      accent: '#6366f1',
+      storeName: currentT.name,
+      storeEmoji: '🏪',
+      receiptHeader: 'Terima kasih telah berbelanja!',
+      receiptFooter: 'Silakan berkunjung kembali.',
+      theme: 'dark'
+    });
+  }
+
+  // Load namespace values into memory exports via mutation (preserves imported ES module bindings)
+  products.length = 0;
+  products.push(...loadJSON(KEYS.products, DEFAULT_PRODUCTS));
+
+  customers.length = 0;
+  customers.push(...loadJSON(KEYS.customers, DEFAULT_CUSTOMERS));
+
+  transactions.length = 0;
+  transactions.push(...loadJSON(KEYS.transactions, DEFAULT_TRANSACTIONS));
+
+  invoices.length = 0;
+  invoices.push(...loadJSON(KEYS.invoices, []));
+
+  bookings.length = 0;
+  bookings.push(...loadJSON(KEYS.bookings, []));
+
+  staff.length = 0;
+  staff.push(...loadJSON(KEYS.staff, DEFAULT_STAFF));
+
+  logs.length = 0;
+  logs.push(...loadJSON(KEYS.logs, []));
+
+  outlets.length = 0;
+  outlets.push(...loadJSON(KEYS.outlets, DEFAULT_OUTLETS));
+
+  activeOutlet = loadJSON(KEYS.activeOutlet, DEFAULT_OUTLETS[0].id);
+
+  notifications.length = 0;
+  notifications.push(...loadJSON(KEYS.notifications, []));
+
+  // Reload branding in memory
+  const savedBranding = loadJSON(KEYS.branding, null);
+  if (savedBranding) {
+    Object.assign(branding, savedBranding);
+  } else {
+    Object.assign(branding, {
+      accent: '#6366f1',
+      storeName: currentT.name,
+      storeEmoji: '🏪',
+      receiptHeader: 'Terima kasih telah berbelanja!',
+      receiptFooter: 'Silakan berkunjung kembali.',
+      theme: 'dark'
+    });
+  }
+}
+
+// Call re-init on startup
+initializeTenantData();
 
 // --- Cloud Sync ---
 export async function syncCloudData() {
@@ -553,8 +665,11 @@ export async function register({ name, email, password, storeName }) {
   });
 
   if (error) return { ok: false, error: error.message };
+  if (!data || !data.user) return { ok: false, error: 'Registration failed to return user data' };
   
-  // Sesi otomatis tersimpan oleh Supabase client
+  const user = data.user;
+  const tenantId = 'tn_' + user.id.slice(0, 8);
+
   const session = { 
     userId: user.id, 
     name: name, 
@@ -562,9 +677,11 @@ export async function register({ name, email, password, storeName }) {
     storeName: storeName, 
     role: 'owner', 
     plan: 'free',
-    tenantId: profile ? profile.tenant_id : null
+    tenantId: tenantId,
+    createdAt: new Date().toISOString().slice(0, 10)
   };
   saveJSON(KEYS.session, session);
+  initializeTenantData(); // Force re-initialization of memory data to load the new tenant namespace!
   return { ok: true, user: session };
 }
 
@@ -590,15 +707,18 @@ export async function login({ email, password }) {
     storeName: profile ? profile.store_name : 'Toko Saya', 
     role: profile ? profile.role : 'owner', 
     plan: profile ? profile.plan : 'free',
-    tenantId: profile ? profile.tenant_id : null
+    tenantId: profile && profile.tenant_id ? profile.tenant_id : 'tn_' + data.user.id.slice(0, 8),
+    createdAt: profile ? new Date(profile.created_at).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10)
   };
   saveJSON(KEYS.session, session);
+  initializeTenantData(); // Force re-initialization of memory data to load the new tenant namespace!
   return { ok: true, user: session };
 }
 
 export async function logout() {
   await supabase.auth.signOut();
   localStorage.removeItem(KEYS.session);
+  initializeTenantData(); // Reset memory data to guest tenant
 }
 
 export function getSession() {
