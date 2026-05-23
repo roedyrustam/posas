@@ -533,6 +533,18 @@ function bindPageEvents(page) {
     }
   }
 
+  if (page === 'settings') {
+    const selOutlet = document.getElementById('sel-active-outlet');
+    if (selOutlet) {
+      selOutlet.addEventListener('change', (e) => {
+        const id = e.target.value;
+        setActiveOutlet(id);
+        showToast('Cabang aktif berhasil diubah');
+        applyBranding(); // Updates header text
+      });
+    }
+  }
+
   if (page === 'pos') {
     // Product tap to add
     document.querySelectorAll('.pos-product').forEach(el => {

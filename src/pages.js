@@ -1,5 +1,5 @@
 // ========== POSAS Page Renderers ==========
-import { products, customers, transactions, invoices, bookings, staff, logs, getWeeklyRevenue, getStats, cart, formatRupiah, getInitials, hashColor, getCurrentUser, branding, getLowStockProducts, getTopProducts, getTopCustomers, generateSalesCSV, exportToCSV } from './data.js';
+import { products, customers, transactions, invoices, bookings, staff, logs, getWeeklyRevenue, getStats, cart, formatRupiah, getInitials, hashColor, getCurrentUser, branding, getLowStockProducts, getTopProducts, getTopCustomers, generateSalesCSV, exportToCSV, outlets, activeOutlet } from './data.js';
 
 // ===== DASHBOARD =====
 export function renderDashboard() {
@@ -612,6 +612,23 @@ export function renderSettings() {
       <span class="material-icons-round text-muted">chevron_right</span>
     </div>
 
+    <div class="section-title mb-8" style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px">Manajemen Multi-Cabang</div>
+    <div class="card mb-24 p-16">
+      <div class="flex justify-between items-center mb-12">
+        <div class="flex items-center gap-8">
+          <span class="material-icons-round text-accent">store</span>
+          <span class="fw-700">Cabang Aktif</span>
+        </div>
+        ${!isPro ? '<span class="badge badge-warning" style="font-size:10px">PRO</span>' : ''}
+      </div>
+      <div class="input-group mb-0">
+        <select class="input" id="sel-active-outlet" ${!isPro ? 'disabled' : ''}>
+          ${outlets.map(o => `<option value="${o.id}" ${activeOutlet === o.id ? 'selected' : ''}>${o.name}</option>`).join('')}
+        </select>
+      </div>
+      ${!isPro ? '<p class="text-xs text-muted mt-8">Fitur multi-cabang eksklusif untuk pengguna paket Pro.</p>' : ''}
+    </div>
+
     <div class="section-title mb-8" style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px">Toko</div>
     <div class="grid-1 mb-16">
       <div class="card flex items-center gap-12 section-link" data-page="storeProfile" style="padding:14px 16px;cursor:pointer">
@@ -759,64 +776,7 @@ export function renderTeam() {
     </div>
   </div>`;
 }
-export function renderPricing() {
-  const user = getCurrentUser() || { plan: 'free' };
-  
-  return `
-  <div class="p-20 fade-in">
-    <div class="text-center mb-32">
-      <h2 class="fw-700" style="font-size:24px">Pilih Paket Bisnis Anda</h2>
-      <p class="text-muted text-sm">Upgrade untuk membuka potensi penuh POSAS</p>
-    </div>
 
-    <div class="grid-1 gap-20">
-      <!-- Free Plan -->
-      <div class="card p-24" style="${user.plan === 'free' ? 'border: 2px solid var(--accent); position: relative' : 'opacity: 0.8'}">
-        ${user.plan === 'free' ? '<span class="badge badge-primary" style="position:absolute; top:-12px; right:20px">PAKET ANDA</span>' : ''}
-        <div class="fw-700 text-lg mb-4">Gratis</div>
-        <div class="flex items-baseline gap-4 mb-16">
-          <span class="fw-700" style="font-size:32px">Rp 0</span>
-          <span class="text-muted text-sm">/selamanya</span>
-        </div>
-        <ul class="text-sm text-muted mb-24" style="padding-left:16px; list-style: disc">
-          <li class="mb-8">Kelola Produk & Stok</li>
-          <li class="mb-8">Point of Sale (POS)</li>
-          <li class="mb-8">Manajemen Pelanggan</li>
-          <li class="mb-8" style="text-decoration: line-through; opacity:0.5">Laporan & Analitik</li>
-          <li class="mb-8" style="text-decoration: line-through; opacity:0.5">Manajemen Tim (Staf)</li>
-        </ul>
-        <button class="btn btn-secondary btn-block" disabled>Sedang Digunakan</button>
-      </div>
-
-      <!-- Pro Plan -->
-      <div class="card p-24" style="${user.plan === 'pro' ? 'border: 2px solid var(--accent); position: relative' : 'border-color: rgba(99, 102, 241, 0.3); background: linear-gradient(to bottom, rgba(99,102,241,0.05), transparent)'}">
-        ${user.plan === 'pro' ? '<span class="badge badge-primary" style="position:absolute; top:-12px; right:20px">PAKET ANDA</span>' : '<span class="badge badge-warning" style="position:absolute; top:-12px; right:20px">TERPOPULER</span>'}
-        <div class="flex items-center gap-8 mb-4">
-          <div class="fw-700 text-lg">Pro</div>
-          <span class="material-icons-round text-warning" style="font-size:18px">diamond</span>
-        </div>
-        <div class="flex items-baseline gap-4 mb-16">
-          <span class="fw-700" style="font-size:32px">Rp 99.000</span>
-          <span class="text-muted text-sm">/bulan</span>
-        </div>
-        <ul class="text-sm mb-24" style="padding-left:16px; list-style: disc">
-          <li class="mb-8">Semua fitur Paket Gratis</li>
-          <li class="mb-8 fw-600">Laporan & Analitik Canggih</li>
-          <li class="mb-8 fw-600">Manajemen Tim (Unlimited Staf)</li>
-          <li class="mb-8 fw-600">Export Data (Excel/CSV/PDF)</li>
-          <li class="mb-8 fw-600">Backup Data Otomatis</li>
-        </ul>
-        <button class="btn btn-primary btn-block" id="btn-upgrade-pro" ${user.plan === 'pro' ? 'disabled' : ''}>
-          ${user.plan === 'pro' ? 'Paket Aktif' : 'Upgrade ke Pro'}
-        </button>
-      </div>
-    </div>
-
-    <p class="text-xs text-muted text-center mt-24">
-      Pembayaran aman. Batalkan kapan saja.<br>Butuh bantuan? <span class="text-accent">Hubungi CS</span>
-    </p>
-  </div>`;
-}
 
 // ===== CUSTOM BRANDING PAGES =====
 
