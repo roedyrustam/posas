@@ -12,7 +12,10 @@ const KEYS = {
   session: 'posas_session',
   branding: 'posas_branding',
   staff: 'posas_staff',
-  logs: 'posas_logs'
+  logs: 'posas_logs',
+  notifications: 'posas_notifications',
+  outlets: 'posas_outlets',
+  activeOutlet: 'posas_active_outlet'
 };
 
 function loadJSON(key, fallback) {
@@ -72,6 +75,11 @@ const DEFAULT_STAFF = [
   { id: 's3', name: 'Maya Manager', email: 'maya@posas.id', role: 'Manajer', status: 'Active', password: 'password123' },
 ];
 
+const DEFAULT_OUTLETS = [
+  { id: 'o1', name: 'Cabang Utama (Pusat)', address: 'Jl. Jend. Sudirman No. 1', phone: '021-1234567' },
+  { id: 'o2', name: 'Cabang Selatan', address: 'Jl. Kemang Raya No. 10', phone: '021-7654321' }
+];
+
 // --- Load from localStorage (or seed defaults) ---
 export let products = loadJSON(KEYS.products, DEFAULT_PRODUCTS);
 export let customers = loadJSON(KEYS.customers, DEFAULT_CUSTOMERS);
@@ -80,6 +88,9 @@ export let invoices = loadJSON(KEYS.invoices, []);
 export let bookings = loadJSON(KEYS.bookings, []);
 export let staff = loadJSON(KEYS.staff, DEFAULT_STAFF);
 export let logs = loadJSON(KEYS.logs, []);
+export let outlets = loadJSON(KEYS.outlets, DEFAULT_OUTLETS);
+export let activeOutlet = loadJSON(KEYS.activeOutlet, DEFAULT_OUTLETS[0].id);
+export let notifications = loadJSON(KEYS.notifications, []);
 
 // --- Branding (Appearance & Store Info) ---
 const DEFAULT_BRANDING = {
@@ -685,6 +696,78 @@ export function getTopCustomers(limit = 5) {
     .sort((a, b) => b.totalSpent - a.totalSpent)
     .slice(0, limit);
 }
+
+// --- Customer Loyalty Tier Logic ---
+export function getCustomerTier(points) {
+  if (points >= 500) return { name: 'Gold', badge: 'badge-warning', discount: 10, icon: 'military_tech', color: '#eab308' }; // 10%
+  if (points >= 200) return { name: 'Silver', badge: 'badge-secondary', discount: 5, icon: 'workspace_premium', color: '#9ca3af' }; // 5%
+  return { name: 'Bronze', badge: 'badge-primary', discount: 0, icon: 'star_outline', color: '#d97706' };
+}
+
+// --- Notifications System ---
+export function getNotifications() {
+  const generated = [];
+  // 1. Low stock alerts
+  const lowStock = getLowStockProducts();
+  lowStock.forEach(p => {
+    generated.push({
+      id: 'sys-low-' + p.id,
+      type: 'warning',
+      title: 'Stok Hampir Habis',
+      message: `${p.name} hanya tersisa ${p.stock} item.`,
+      icon: 'inventory_2',
+      date: new Date().toISOString()
+    });
+  });
+  
+  // 2. Upcoming bookings (today)
+  const today = new Date().toISOString().slice(0, 10);
+  const todaysBookings = bookings.filter(b => b.date === today && b.status === 'confirmed');
+  if (todaysBookings.length > 0) {
+    generated.push({
+      id: 'sys-book-' + today,
+      type: 'info',
+      title: 'Booking Hari Ini',
+      message: `Ada ${todaysBookings.length} jadwal booking hari ini.`,
+      icon: 'event',
+      date: new Date().toISOString()
+    });
+  }
+
+  // Combine generated with persistent notifications, remove duplicates by id
+  const combined = [...generated, ...notifications];
+  const unique = [];
+  const seen = new Set();
+  for (const n of combined) {
+    if (!seen.has(n.id)) {
+      seen.add(n.id);
+      unique.push(n);
+    }
+  }
+  return unique.sort((a, b) => new Date(b.date) - new Date(a.date));
+}
+
+export function dismissNotification(id) {
+  // If it's a persistent notification, remove it
+  const idx = notifications.findIndex(n => n.id === id);
+  if (idx > -1) {
+    notifications.splice(idx, 1);
+    saveJSON(KEYS.notifications, notifications);
+  }
+  // System generated notifications (sys-) can't be dismissed permanently unless the cause is resolved
+}
+
+// --- Outlet Management ---
+export function setActiveOutlet(id) {
+  const outlet = outlets.find(o => o.id === id);
+  if (outlet) {
+    activeOutlet = id;
+    saveJSON(KEYS.activeOutlet, activeOutlet);
+    return true;
+  }
+  return false;
+}
+
 
 export function generateSalesCSV() {
   const headers = ['ID', 'Pelanggan', 'Tanggal', 'Metode', 'Item', 'Total'];

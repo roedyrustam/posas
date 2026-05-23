@@ -3,7 +3,7 @@ import './style.css';
 import Chart from 'chart.js/auto';
 import * as htmlToImage from 'html-to-image';
 import { createPaymentInvoice, checkPaymentStatus } from './payment.js';
-import { products, customers, cart, formatRupiah, addProduct, addCustomer, addTransaction, decreaseStock, addInvoice, updateInvoiceStatus, addBooking, updateBookingStatus, deleteProduct, deleteCustomer, register, login, logout, getSession, getCurrentUser, exportToCSV, transactions, canAccess, fetchTeam, addStaff, removeStaff, redeemPoints, upgradeToPro, bulkAddProducts, branding, updateBranding, logs, addLog } from './data.js';
+import { products, customers, cart, formatRupiah, addProduct, addCustomer, addTransaction, decreaseStock, addInvoice, updateInvoiceStatus, addBooking, updateBookingStatus, deleteProduct, deleteCustomer, register, login, logout, getSession, getCurrentUser, exportToCSV, transactions, canAccess, fetchTeam, addStaff, removeStaff, redeemPoints, upgradeToPro, bulkAddProducts, branding, updateBranding, logs, addLog, getNotifications, dismissNotification, getCustomerTier, outlets, activeOutlet, setActiveOutlet } from './data.js';
 import {
   renderDashboard, renderPOS, renderProducts,
   renderCustomers, renderFinance, renderBooking,
@@ -52,6 +52,7 @@ function showCustomerDetailModal(customer) {
   const user = getCurrentUser() || { plan: 'free' };
   const isPro = user.plan === 'pro';
   const initials = customer.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  const tier = getCustomerTier(customer.points || 0);
 
   showModal(`
     <div class="p-4">
@@ -62,6 +63,7 @@ function showCustomerDetailModal(customer) {
         <div>
           <h2 class="fw-700" style="font-size:20px">${customer.name}</h2>
           <p class="text-muted text-sm">${customer.phone}</p>
+          <span class="badge ${tier.badge} mt-4"><span class="material-icons-round" style="font-size:12px;margin-right:2px">${tier.icon}</span>${tier.name}</span>
         </div>
       </div>
 
@@ -72,8 +74,8 @@ function showCustomerDetailModal(customer) {
         </div>
         <div class="card p-12 text-center">
           <div class="text-muted text-xs uppercase mb-4">Poin Loyalitas</div>
-          <div class="fw-700 text-warning flex items-center justify-center gap-4">
-            <span class="material-icons-round" style="font-size:18px">stars</span>
+          <div class="fw-700 flex items-center justify-center gap-4" style="color:${tier.color}">
+            <span class="material-icons-round" style="font-size:18px">${tier.icon}</span>
             ${customer.points || 0}
           </div>
         </div>
@@ -158,11 +160,14 @@ function applyBranding() {
   document.documentElement.style.setProperty('--accent', branding.accent);
   
   // Update store name in header and drawer if needed
+  const outlet = outlets.find(o => o.id === activeOutlet);
+  const displayName = branding.storeName + (outlet ? ` - ${outlet.name}` : '');
+  
   const tenantName = $('tenant-name');
-  if (tenantName) tenantName.textContent = branding.storeName;
+  if (tenantName) tenantName.textContent = displayName;
   
   const drawerStore = document.querySelector('.drawer-brand-name');
-  if (drawerStore) drawerStore.textContent = branding.storeName;
+  if (drawerStore) drawerStore.textContent = displayName;
   
   const drawerLogo = document.querySelector('.drawer-logo');
   if (drawerLogo && branding.storeEmoji) {
@@ -246,6 +251,83 @@ function showModal(content) {
 function closeModal() {
   modalOverlay.classList.add('hidden');
   modalContainer.classList.add('hidden');
+}
+
+// ===== Notifications =====
+function renderNotificationDropdown() {
+  const notifs = getNotifications();
+  const list = $('notification-list');
+  const badge = $('notification-badge');
+  
+  if (notifs.length > 0) {
+    badge.style.display = 'block';
+    list.innerHTML = notifs.map(n => `
+      <div class="p-12 flex items-start gap-12" style="border-bottom:1px solid var(--border)">
+        <div class="stat-icon" style="background:var(--bg-elevated);color:var(--${n.type});width:32px;height:32px;padding:0">
+          <span class="material-icons-round" style="font-size:16px">${n.icon}</span>
+        </div>
+        <div class="flex-1">
+          <div class="text-sm fw-600">${n.title}</div>
+          <div class="text-xs text-muted mb-4">${n.message}</div>
+        </div>
+        ${!n.id.startsWith('sys-') ? `
+        <button class="icon-btn btn-dismiss-notif" data-id="${n.id}" style="width:24px;height:24px" aria-label="Hapus">
+          <span class="material-icons-round text-muted" style="font-size:14px">close</span>
+        </button>` : ''}
+      </div>
+    `).join('');
+  } else {
+    badge.style.display = 'none';
+    list.innerHTML = `
+      <div class="p-24 text-center opacity-50">
+        <span class="material-icons-round mb-8" style="font-size:32px">notifications_none</span>
+        <div class="text-sm">Belum ada notifikasi</div>
+      </div>
+    `;
+  }
+
+  // Dismiss events
+  list.querySelectorAll('.btn-dismiss-notif').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dismissNotification(btn.dataset.id);
+      renderNotificationDropdown();
+    });
+  });
+}
+
+function initNotifications() {
+  const btn = $('btn-notifications');
+  const dropdown = $('notification-dropdown');
+  const readAll = $('btn-read-all-notif');
+
+  if (btn && dropdown) {
+    btn.addEventListener('click', () => {
+      dropdown.classList.toggle('hidden');
+      if (!dropdown.classList.contains('hidden')) {
+        renderNotificationDropdown();
+      }
+    });
+
+    // Close when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!btn.contains(e.target) && !dropdown.contains(e.target)) {
+        dropdown.classList.add('hidden');
+      }
+    });
+  }
+
+  if (readAll) {
+    readAll.addEventListener('click', () => {
+      // In a real app, clear all non-sys notifications
+      getNotifications().forEach(n => {
+        if (!n.id.startsWith('sys-')) dismissNotification(n.id);
+      });
+      renderNotificationDropdown();
+    });
+  }
+
+  renderNotificationDropdown();
 }
 
 // ===== POS Cart Logic =====
@@ -1458,7 +1540,7 @@ async function init() {
   modalOverlay.addEventListener('click', closeModal);
 
   // Notifications
-  $('btn-notifications').addEventListener('click', () => showToast('Tidak ada notifikasi baru'));
+  initNotifications();
 
   // Profile
   $('btn-profile').addEventListener('click', () => navigateTo('settings'));

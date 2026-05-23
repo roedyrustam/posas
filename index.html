@@ -48,11 +48,18 @@
             <span id="tenant-name" class="tenant-badge">Toko Saya</span>
           </div>
         </div>
-        <div class="top-bar-right">
+        <div class="top-bar-right" style="position:relative">
           <button id="btn-notifications" class="icon-btn notification-btn" aria-label="Notifikasi">
             <span class="material-icons-round">notifications</span>
-            <span class="notification-dot"></span>
+            <span class="notification-dot" id="notification-badge" style="display:none"></span>
           </button>
+          <div id="notification-dropdown" class="card hidden" style="position:absolute; top:48px; right:0; width:300px; max-height:400px; overflow-y:auto; z-index:100; box-shadow:var(--shadow-lg)">
+            <div class="p-12 flex justify-between items-center" style="border-bottom:1px solid var(--border)">
+              <span class="fw-700">Notifikasi</span>
+              <button class="btn btn-xs btn-ghost" id="btn-read-all-notif">Tandai Dibaca</button>
+            </div>
+            <div id="notification-list"></div>
+          </div>
           <button id="btn-profile" class="avatar-btn" aria-label="Profil">
             <span class="avatar-text">RS</span>
           </button>
