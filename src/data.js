@@ -135,8 +135,16 @@ if (!localStorage.getItem(KEYS.products)) saveJSON(KEYS.products, products);
 
 // --- CRUD: Products ---
 export async function addProduct({ name, price, stock, category, emoji }) {
+  const session = getSession();
+  if (!session) return { error: 'Unauthorized' };
+
+  // Limit check
+  if (session.plan === 'free' && products.length >= 50) {
+    return { error: 'LIMIT_REACHED' };
+  }
+
   const user = (await supabase.auth.getUser()).data.user;
-  if (!user) return null;
+  if (!user) return { error: 'Auth failed' };
 
   const product = {
     id: crypto.randomUUID(),
