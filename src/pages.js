@@ -1,5 +1,5 @@
 // ========== POSAS Page Renderers ==========
-import { products, customers, transactions, invoices, bookings, staff, logs, getWeeklyRevenue, getStats, cart, formatRupiah, getInitials, hashColor, getCurrentUser, branding, getLowStockProducts, getTopProducts, getTopCustomers, generateSalesCSV, exportToCSV, outlets, activeOutlet } from './data.js';
+import { products, customers, transactions, invoices, bookings, staff, logs, getWeeklyRevenue, getStats, cart, formatRupiah, getInitials, hashColor, getCurrentUser, branding, getLowStockProducts, getTopProducts, getTopCustomers, generateSalesCSV, exportToCSV, outlets, activeOutlet, getFilteredProducts, getFilteredTransactions, getFilteredInvoices, getFilteredBookings } from './data.js';
 
 // ===== DASHBOARD =====
 export function renderDashboard() {
@@ -148,7 +148,7 @@ export function renderPOS() {
     </div>
 
     <div class="pos-grid" id="pos-products">
-      ${products.map(p => `
+      ${getFilteredProducts().map(p => `
         <div class="pos-product" data-id="${p.id}">
           <div class="pos-product-icon">${p.emoji}</div>
           <div class="pos-product-name">${p.name}</div>
@@ -174,6 +174,7 @@ export function renderPOS() {
 
 // ===== PRODUCTS =====
 export function renderProducts() {
+  const filteredProducts = getFilteredProducts();
   return `
   <div class="fade-in">
     <div class="search-bar">
@@ -182,7 +183,7 @@ export function renderProducts() {
     </div>
 
     <div class="flex justify-between items-center mb-16">
-      <span class="text-sm text-muted">${products.length} produk</span>
+      <span class="text-sm text-muted">${filteredProducts.length} produk</span>
       <div class="flex gap-8">
         <button class="btn btn-sm btn-secondary" id="btn-import-products">
           <span class="material-icons-round" style="font-size:16px">file_upload</span> Import
@@ -194,7 +195,7 @@ export function renderProducts() {
     </div>
 
     <div class="grid-1">
-      ${products.map(p => `
+      ${filteredProducts.map(p => `
         <div class="card flex items-center gap-12" style="padding:14px 16px">
           <div style="font-size:32px;flex-shrink:0">${p.emoji}</div>
           <div class="list-content">
@@ -263,7 +264,8 @@ export function renderCustomers() {
 export function renderFinance() {
   const stats = getStats();
   const lowStock = getLowStockProducts();
-  const totalIn = transactions.reduce((s, t) => s + t.total, 0);
+  const filteredTxns = getFilteredTransactions();
+  const totalIn = filteredTxns.reduce((s, t) => s + t.total, 0);
 
   return `
   <div class="fade-in">
@@ -299,7 +301,7 @@ export function renderFinance() {
         <span class="section-title">Riwayat Transaksi</span>
       </div>
       <div class="card" style="padding:4px 16px">
-        ${transactions.map(t => `
+        ${filteredTxns.map(t => `
           <div class="list-item">
             <div class="list-avatar" style="background:${hashColor(t.customer)};color:#fff">${getInitials(t.customer)}</div>
             <div class="list-content">
@@ -319,7 +321,8 @@ export function renderFinance() {
 
 // ===== BOOKING =====
 export function renderBooking() {
-  if (bookings.length === 0) {
+  const filteredBookings = getFilteredBookings();
+  if (filteredBookings.length === 0) {
     return `
     <div class="fade-in">
       <div class="empty-state">
@@ -332,8 +335,8 @@ export function renderBooking() {
       </button>
     </div>`;
   }
-  const upcoming = bookings.filter(b => b.status === 'confirmed');
-  const past = bookings.filter(b => b.status !== 'confirmed');
+  const upcoming = filteredBookings.filter(b => b.status === 'confirmed');
+  const past = filteredBookings.filter(b => b.status !== 'confirmed');
   return `
   <div class="fade-in">
     ${upcoming.length > 0 ? `
@@ -375,7 +378,8 @@ export function renderBooking() {
 // ===== INVOICES =====
 export function renderInvoices() {
   const statusMap = { draft: ['badge-info', 'Draft'], sent: ['badge-warning', 'Terkirim'], paid: ['badge-success', 'Lunas'] };
-  if (invoices.length === 0) {
+  const filteredInvoices = getFilteredInvoices();
+  if (filteredInvoices.length === 0) {
     return `
     <div class="fade-in">
       <div class="empty-state">
@@ -393,16 +397,16 @@ export function renderInvoices() {
     <div class="grid-2 mb-16">
       <div class="stat-card green">
         <div class="stat-icon green"><span class="material-icons-round">check_circle</span></div>
-        <div class="stat-value" style="font-size:18px">${invoices.filter(i => i.status === 'paid').length}</div>
+        <div class="stat-value" style="font-size:18px">${filteredInvoices.filter(i => i.status === 'paid').length}</div>
         <div class="stat-label">Lunas</div>
       </div>
       <div class="stat-card orange">
         <div class="stat-icon orange"><span class="material-icons-round">pending</span></div>
-        <div class="stat-value" style="font-size:18px">${invoices.filter(i => i.status !== 'paid').length}</div>
+        <div class="stat-value" style="font-size:18px">${filteredInvoices.filter(i => i.status !== 'paid').length}</div>
         <div class="stat-label">Belum Lunas</div>
       </div>
     </div>
-    <div class="grid-1">${invoices.map(inv => {
+    <div class="grid-1">${filteredInvoices.map(inv => {
       const [bc, bt] = statusMap[inv.status] || statusMap.draft;
       return `
       <div class="card" style="padding:14px 16px">
@@ -621,11 +625,23 @@ export function renderSettings() {
         </div>
         ${!isPro ? '<span class="badge badge-warning" style="font-size:10px">PRO</span>' : ''}
       </div>
-      <div class="input-group mb-0">
+      <div class="input-group mb-12">
         <select class="input" id="sel-active-outlet" ${!isPro ? 'disabled' : ''}>
+          ${isPro ? `<option value="all" ${activeOutlet === 'all' ? 'selected' : ''}>Semua Cabang (Konsolidasi)</option>` : ''}
           ${outlets.map(o => `<option value="${o.id}" ${activeOutlet === o.id ? 'selected' : ''}>${o.name}</option>`).join('')}
         </select>
       </div>
+      ${isPro ? `
+      <button class="btn btn-outline btn-block btn-sm flex items-center justify-center gap-8" id="btn-go-manage-outlets" style="border-radius:var(--radius-md); padding:10px">
+        <span class="material-icons-round" style="font-size:16px">storefront</span>
+        Kelola Semua Cabang
+      </button>
+      ` : `
+      <button class="btn btn-outline btn-block btn-sm flex items-center justify-center gap-8" id="btn-go-manage-outlets-locked" style="border-radius:var(--radius-md); padding:10px">
+        <span class="material-icons-round" style="font-size:16px">storefront</span>
+        Kelola Semua Cabang <span class="badge badge-warning" style="font-size:9px;margin-left:4px">PRO</span>
+      </button>
+      `}
       ${!isPro ? '<p class="text-xs text-muted mt-8">Fitur multi-cabang eksklusif untuk pengguna paket Pro.</p>' : ''}
     </div>
 
@@ -1082,4 +1098,47 @@ export function renderInvoiceDetail(invId) {
       </div>
     </div>
   `;
+}
+
+// ===== MANAGE OUTLETS =====
+export function renderManageOutlets() {
+  const user = getCurrentUser() || { plan: 'free' };
+  const isPro = user.plan === 'pro';
+
+  return `
+  <div class="fade-in">
+    <div class="mb-16">
+      <p class="text-sm text-muted">Kelola semua cabang outlet bisnis Anda di satu tempat.</p>
+    </div>
+
+    <div class="grid-1">
+      ${outlets.map(o => `
+        <div class="card p-16 mb-12 flex items-center justify-between" style="border-radius:16px">
+          <div class="flex items-center gap-12">
+            <div class="flex-center" style="background:var(--accent-glow); color:var(--accent); width:40px; height:40px; border-radius:12px">
+              <span class="material-icons-round">store</span>
+            </div>
+            <div>
+              <div class="fw-700 text-sm">${o.name}</div>
+              <div class="text-xs text-muted">${o.address || 'Tidak ada alamat'} · ${o.phone || 'Tidak ada telepon'}</div>
+            </div>
+          </div>
+          <div class="flex gap-4">
+            <button class="icon-btn btn-edit-outlet" data-id="${o.id}" style="color:var(--accent)" aria-label="Edit Cabang">
+              <span class="material-icons-round" style="font-size:18px">edit</span>
+            </button>
+            ${o.id !== 'o1' ? `
+              <button class="icon-btn btn-delete-outlet" data-id="${o.id}" style="color:var(--danger)" aria-label="Hapus Cabang">
+                <span class="material-icons-round" style="font-size:18px">delete</span>
+              </button>
+            ` : ''}
+          </div>
+        </div>
+      `).join('')}
+    </div>
+
+    <button class="btn-fab" id="btn-add-outlet" aria-label="Tambah Cabang">
+      <span class="material-icons-round">add</span>
+    </button>
+  </div>`;
 }

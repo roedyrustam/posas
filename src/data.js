@@ -155,6 +155,7 @@ export async function addProduct({ name, price, stock, category, emoji }) {
     stock: Number(stock),
     category,
     emoji: emoji || '📦',
+    outletId: activeOutlet || 'o1'
   };
 
   products.unshift(product);
@@ -193,7 +194,8 @@ export async function bulkAddProducts(items) {
     tenant_id: user.tenantId,
     emoji: p.emoji || '📦',
     stock: Number(p.stock) || 0,
-    price: Number(p.price) || 0
+    price: Number(p.price) || 0,
+    outletId: activeOutlet || 'o1'
   }));
 
   const { data, error } = await supabase
@@ -271,11 +273,12 @@ export async function addTransaction({ items, total, customer, method, cartItems
     total: Number(total),
     customer_name: customer || 'Walk-in',
     method: method || 'Tunai',
-    raw_items: cartItems // For deep reporting
+    raw_items: cartItems, // For deep reporting
+    outletId: activeOutlet || 'o1'
   };
 
   // For local UI consistency
-  const localTxn = { ...txn, date: dateStr, customer: txn.customer_name, items: items, cartItems: cartItems };
+  const localTxn = { ...txn, date: dateStr, customer: txn.customer_name, items: items, cartItems: cartItems, outletId: activeOutlet || 'o1' };
   transactions.unshift(localTxn);
   saveJSON(KEYS.transactions, transactions);
 
@@ -287,7 +290,8 @@ export async function addTransaction({ items, total, customer, method, cartItems
     items: items,
     total: txn.total,
     customer_name: txn.customer_name,
-    method: txn.method
+    method: txn.method,
+    outlet_id: activeOutlet || 'o1'
   });
 
   // Update customer stats
@@ -340,13 +344,14 @@ export async function addInvoice({ customer, items, total, dueDate, notes }) {
     notes: notes || '',
     status: 'draft', // draft, sent, paid
     created_at: new Date().toISOString(),
+    outletId: activeOutlet || 'o1'
   };
 
-  const localInv = { ...inv, number: inv.invoice_number, customer: inv.customer_name, dueDate: inv.due_date, createdAt: inv.created_at.slice(0, 10) };
+  const localInv = { ...inv, number: inv.invoice_number, customer: inv.customer_name, dueDate: inv.due_date, createdAt: inv.created_at.slice(0, 10), outletId: activeOutlet || 'o1' };
   invoices.unshift(localInv);
   saveJSON(KEYS.invoices, invoices);
 
-  await supabase.from('invoices').insert({ ...inv, tenant_id: getSession().tenantId });
+  await supabase.from('invoices').insert({ ...inv, tenant_id: getSession().tenantId, outlet_id: activeOutlet || 'o1' });
   return localInv;
 }
 
@@ -384,13 +389,14 @@ export async function addBooking({ customerName, service, date, time, notes }) {
     notes: notes || '',
     status: 'confirmed', // confirmed, completed, cancelled
     created_at: new Date().toISOString(),
+    outletId: activeOutlet || 'o1'
   };
 
-  const localBk = { ...booking, customerName: booking.customer_name, createdAt: booking.created_at.slice(0, 10) };
+  const localBk = { ...booking, customerName: booking.customer_name, createdAt: booking.created_at.slice(0, 10), outletId: activeOutlet || 'o1' };
   bookings.unshift(localBk);
   saveJSON(KEYS.bookings, bookings);
 
-  await supabase.from('bookings').insert({ ...booking, tenant_id: getSession().tenantId });
+  await supabase.from('bookings').insert({ ...booking, tenant_id: getSession().tenantId, outlet_id: activeOutlet || 'o1' });
   return localBk;
 }
 
@@ -404,17 +410,40 @@ export async function updateBookingStatus(id, status) {
   return bk;
 }
 
+// --- Scoped Filtering Getters ---
+export function getFilteredProducts() {
+  if (activeOutlet === 'all') return products;
+  return products.filter(p => (p.outletId || 'o1') === activeOutlet);
+}
+
+export function getFilteredTransactions() {
+  if (activeOutlet === 'all') return transactions;
+  return transactions.filter(t => (t.outletId || 'o1') === activeOutlet);
+}
+
+export function getFilteredInvoices() {
+  if (activeOutlet === 'all') return invoices;
+  return invoices.filter(i => (i.outletId || 'o1') === activeOutlet);
+}
+
+export function getFilteredBookings() {
+  if (activeOutlet === 'all') return bookings;
+  return bookings.filter(b => (b.outletId || 'o1') === activeOutlet);
+}
+
 // --- Dynamic Stats ---
 export function getStats() {
   const today = new Date().toISOString().slice(0, 10);
-  const todayTxns = transactions.filter(t => t.date.startsWith(today));
+  const filteredProds = getFilteredProducts();
+  const filteredTxns = getFilteredTransactions();
+  const todayTxns = filteredTxns.filter(t => t.date && t.date.startsWith(today));
   return {
     todayRevenue: todayTxns.reduce((s, t) => s + t.total, 0),
     todayOrders: todayTxns.length,
-    totalProducts: products.length,
+    totalProducts: filteredProds.length,
     totalCustomers: customers.length,
-    monthRevenue: transactions.reduce((s, t) => s + t.total, 0),
-    lowStock: products.filter(p => p.stock < 20).length,
+    monthRevenue: filteredTxns.reduce((s, t) => s + t.total, 0),
+    lowStock: filteredProds.filter(p => (p.stock || 0) < 20).length,
   };
 }
 
@@ -423,12 +452,13 @@ export function getWeeklyRevenue() {
   const dayNames = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
   const now = new Date();
   const result = [];
+  const filteredTxns = getFilteredTransactions();
 
   for (let i = 6; i >= 0; i--) {
     const d = new Date(now);
     d.setDate(d.getDate() - i);
     const dateStr = d.toISOString().slice(0, 10);
-    const dayTxns = transactions.filter(t => t.date.startsWith(dateStr));
+    const dayTxns = filteredTxns.filter(t => t.date && t.date.startsWith(dateStr));
     const amount = dayTxns.reduce((s, t) => s + t.total, 0);
     result.push({ day: dayNames[d.getDay()], amount });
   }
@@ -585,9 +615,9 @@ export function canAccess(action) {
   if (!user) return false;
   
   const permissions = {
-    'owner': ['dashboard', 'pos', 'products', 'customers', 'finance', 'reports', 'booking', 'invoices', 'settings', 'manage_staff', 'delete_data', 'appearance', 'storeProfile', 'receiptSettings', 'team', 'loyalty', 'logs'],
-    'kasir': ['dashboard', 'pos', 'customers', 'booking', 'settings', 'appearance', 'storeProfile', 'receiptSettings'],
-    'manajer': ['dashboard', 'pos', 'products', 'customers', 'booking', 'invoices', 'settings', 'reports', 'appearance', 'storeProfile', 'receiptSettings', 'loyalty', 'logs']
+    'owner': ['dashboard', 'pos', 'products', 'customers', 'finance', 'reports', 'booking', 'invoices', 'settings', 'manage_staff', 'delete_data', 'appearance', 'storeProfile', 'receiptSettings', 'team', 'loyalty', 'logs', 'manage_outlets'],
+    'kasir': ['dashboard', 'pos', 'customers', 'booking', 'settings', 'appearance', 'storeProfile', 'receiptSettings', 'manage_outlets'],
+    'manajer': ['dashboard', 'pos', 'products', 'customers', 'booking', 'invoices', 'settings', 'reports', 'appearance', 'storeProfile', 'receiptSettings', 'loyalty', 'logs', 'manage_outlets']
   };
   
   const allowed = permissions[user.role.toLowerCase()] || [];
@@ -664,7 +694,7 @@ export function exportToCSV(filename, data) {
 }
 
 export function getLowStockProducts() {
-  return products.filter(p => (p.stock || 0) <= 10);
+  return getFilteredProducts().filter(p => (p.stock || 0) <= 10);
 }
 
 export async function redeemPoints(customerId, pointsToRedeem) {
@@ -680,7 +710,8 @@ export async function redeemPoints(customerId, pointsToRedeem) {
 
 export function getTopProducts(limit = 5) {
   const counts = {};
-  transactions.forEach(t => {
+  const filteredTxns = getFilteredTransactions();
+  filteredTxns.forEach(t => {
     if (t.cartItems) {
       t.cartItems.forEach(item => {
         counts[item.name] = (counts[item.name] || 0) + item.qty;
@@ -767,6 +798,15 @@ export function dismissNotification(id) {
 
 // --- Outlet Management ---
 export function setActiveOutlet(id) {
+  if (id === 'all') {
+    const session = getSession();
+    if (session && session.plan === 'pro') {
+      activeOutlet = 'all';
+      saveJSON(KEYS.activeOutlet, activeOutlet);
+      return true;
+    }
+    return false;
+  }
   const outlet = outlets.find(o => o.id === id);
   if (outlet) {
     activeOutlet = id;
@@ -774,6 +814,49 @@ export function setActiveOutlet(id) {
     return true;
   }
   return false;
+}
+
+export async function addOutlet({ name, address, phone }) {
+  const session = getSession();
+  if (!session || session.plan !== 'pro') return { error: 'PRO_ONLY' };
+
+  const newOutlet = {
+    id: 'o' + Date.now(),
+    name,
+    address: address || '',
+    phone: phone || ''
+  };
+
+  outlets.push(newOutlet);
+  saveJSON(KEYS.outlets, outlets);
+  return { success: true, outlet: newOutlet };
+}
+
+export async function updateOutlet(id, updates) {
+  const session = getSession();
+  if (!session || session.plan !== 'pro') return { error: 'PRO_ONLY' };
+
+  const idx = outlets.findIndex(o => o.id === id);
+  if (idx === -1) return { error: 'NOT_FOUND' };
+
+  Object.assign(outlets[idx], updates);
+  saveJSON(KEYS.outlets, outlets);
+  return { success: true, outlet: outlets[idx] };
+}
+
+export async function deleteOutlet(id) {
+  const session = getSession();
+  if (!session || session.plan !== 'pro') return { error: 'PRO_ONLY' };
+
+  if (id === 'o1') return { error: 'CANNOT_DELETE_PRIMARY' };
+  if (id === activeOutlet) return { error: 'CANNOT_DELETE_ACTIVE' };
+
+  const idx = outlets.findIndex(o => o.id === id);
+  if (idx === -1) return { error: 'NOT_FOUND' };
+
+  outlets.splice(idx, 1);
+  saveJSON(KEYS.outlets, outlets);
+  return { success: true };
 }
 
 

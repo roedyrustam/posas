@@ -3,12 +3,13 @@ import './style.css';
 import Chart from 'chart.js/auto';
 import * as htmlToImage from 'html-to-image';
 import { createPaymentInvoice, checkPaymentStatus } from './payment.js';
-import { products, customers, cart, formatRupiah, addProduct, addCustomer, addTransaction, decreaseStock, addInvoice, updateInvoiceStatus, addBooking, updateBookingStatus, deleteProduct, deleteCustomer, register, login, logout, getSession, getCurrentUser, exportToCSV, transactions, canAccess, fetchTeam, addStaff, removeStaff, redeemPoints, upgradeToPro, bulkAddProducts, branding, updateBranding, logs, addLog, getNotifications, dismissNotification, getCustomerTier, outlets, activeOutlet, setActiveOutlet } from './data.js';
+import { products, customers, cart, formatRupiah, addProduct, addCustomer, addTransaction, decreaseStock, addInvoice, updateInvoiceStatus, addBooking, updateBookingStatus, deleteProduct, deleteCustomer, register, login, logout, getSession, getCurrentUser, exportToCSV, transactions, canAccess, fetchTeam, addStaff, removeStaff, redeemPoints, upgradeToPro, bulkAddProducts, branding, updateBranding, logs, addLog, getNotifications, dismissNotification, getCustomerTier, outlets, activeOutlet, setActiveOutlet, addOutlet, updateOutlet, deleteOutlet } from './data.js';
 import {
   renderDashboard, renderPOS, renderProducts,
   renderCustomers, renderFinance, renderBooking,
   renderInvoices, renderReports, renderSettings, renderTeam, renderPricing,
-  renderAppearance, renderStoreProfile, renderReceiptSettings, renderLogs, renderInvoiceDetail
+  renderAppearance, renderStoreProfile, renderReceiptSettings, renderLogs, renderInvoiceDetail,
+  renderManageOutlets
 } from './pages.js';
 import { getWeeklyRevenue } from './data.js';
 
@@ -142,6 +143,7 @@ const pages = {
   appearance: { title: 'Tampilan', render: renderAppearance, pro: true },
   storeProfile: { title: 'Profil Toko', render: renderStoreProfile },
   receiptSettings: { title: 'Struk & Nota', render: renderReceiptSettings },
+  manage_outlets: { title: 'Kelola Cabang', render: renderManageOutlets }
 };
 
 let currentPage = 'dashboard';
@@ -539,10 +541,159 @@ function bindPageEvents(page) {
       selOutlet.addEventListener('change', (e) => {
         const id = e.target.value;
         setActiveOutlet(id);
-        showToast('Cabang aktif berhasil diubah');
+        cart.clear(); // Clear checkout cart when switching outlet
+        showToast('Cabang aktif diubah (Keranjang direset)');
         applyBranding(); // Updates header text
       });
     }
+
+    const btnManage = document.getElementById('btn-go-manage-outlets');
+    if (btnManage) {
+      btnManage.addEventListener('click', () => navigateTo('manage_outlets'));
+    }
+
+    const btnManageLocked = document.getElementById('btn-go-manage-outlets-locked');
+    if (btnManageLocked) {
+      btnManageLocked.addEventListener('click', () => showUpgradeModal('Kelola Semua Cabang'));
+    }
+  }
+
+  if (page === 'manage_outlets') {
+    const user = getCurrentUser() || { plan: 'free' };
+    const isPro = user.plan === 'pro';
+
+    const btnAdd = document.getElementById('btn-add-outlet');
+    if (btnAdd) {
+      btnAdd.addEventListener('click', () => {
+        if (!isPro) {
+          showUpgradeModal('Tambah Cabang Baru');
+          return;
+        }
+        showModal(`
+          <div class="modal-title">Tambah Cabang Baru</div>
+          <div class="input-group">
+            <label class="input-label">Nama Cabang *</label>
+            <input class="input" id="inp-outlet-name" placeholder="Contoh: Cabang Barat" />
+          </div>
+          <div class="input-group">
+            <label class="input-label">Alamat</label>
+            <input class="input" id="inp-outlet-address" placeholder="Contoh: Jl. Diponegoro No. 12" />
+          </div>
+          <div class="input-group">
+            <label class="input-label">Telepon</label>
+            <input class="input" id="inp-outlet-phone" placeholder="Contoh: 0812345678" />
+          </div>
+          <button class="btn btn-primary btn-block mt-16" id="btn-save-new-outlet">Simpan Cabang</button>
+        `);
+
+        setTimeout(() => {
+          document.getElementById('btn-save-new-outlet').addEventListener('click', async () => {
+            const name = document.getElementById('inp-outlet-name').value.trim();
+            const address = document.getElementById('inp-outlet-address').value.trim();
+            const phone = document.getElementById('inp-outlet-phone').value.trim();
+
+            if (!name) {
+              showToast('⚠ Nama cabang wajib diisi');
+              return;
+            }
+
+            const res = await addOutlet({ name, address, phone });
+            if (res.error) {
+              showToast('⚠ Gagal menambah cabang: ' + res.error);
+            } else {
+              showToast('🏢 Cabang baru berhasil ditambahkan');
+              closeModal();
+              navigateTo('manage_outlets');
+            }
+          });
+        }, 50);
+      });
+    }
+
+    document.querySelectorAll('.btn-edit-outlet').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (!isPro) {
+          showUpgradeModal('Ubah Detail Cabang');
+          return;
+        }
+        const id = btn.dataset.id;
+        const outlet = outlets.find(o => o.id === id);
+        if (!outlet) return;
+
+        showModal(`
+          <div class="modal-title">Ubah Detail Cabang</div>
+          <div class="input-group">
+            <label class="input-label">Nama Cabang *</label>
+            <input class="input" id="inp-outlet-name" value="${outlet.name}" placeholder="Contoh: Cabang Barat" />
+          </div>
+          <div class="input-group">
+            <label class="input-label">Alamat</label>
+            <input class="input" id="inp-outlet-address" value="${outlet.address || ''}" placeholder="Contoh: Jl. Diponegoro No. 12" />
+          </div>
+          <div class="input-group">
+            <label class="input-label">Telepon</label>
+            <input class="input" id="inp-outlet-phone" value="${outlet.phone || ''}" placeholder="Contoh: 0812345678" />
+          </div>
+          <button class="btn btn-primary btn-block mt-16" id="btn-save-edit-outlet">Simpan Perubahan</button>
+        `);
+
+        setTimeout(() => {
+          document.getElementById('btn-save-edit-outlet').addEventListener('click', async () => {
+            const name = document.getElementById('inp-outlet-name').value.trim();
+            const address = document.getElementById('inp-outlet-address').value.trim();
+            const phone = document.getElementById('inp-outlet-phone').value.trim();
+
+            if (!name) {
+              showToast('⚠ Nama cabang wajib diisi');
+              return;
+            }
+
+            const res = await updateOutlet(id, { name, address, phone });
+            if (res.error) {
+              showToast('⚠ Gagal mengubah cabang: ' + res.error);
+            } else {
+              showToast('🏢 Detail cabang berhasil diperbarui');
+              closeModal();
+              navigateTo('manage_outlets');
+            }
+          });
+        }, 50);
+      });
+    });
+
+    document.querySelectorAll('.btn-delete-outlet').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (!isPro) {
+          showUpgradeModal('Hapus Cabang');
+          return;
+        }
+        const id = btn.dataset.id;
+        const outlet = outlets.find(o => o.id === id);
+        if (!outlet) return;
+
+        showModal(`
+          <div class="modal-title text-center" style="color:var(--danger)">Hapus Cabang?</div>
+          <p class="text-sm text-muted text-center mb-24">Apakah Anda yakin ingin menghapus cabang <b>${outlet.name}</b>? Tindakan ini tidak dapat dibatalkan.</p>
+          <div class="flex gap-12">
+            <button class="btn btn-secondary flex-1" onclick="closeModal()">Batal</button>
+            <button class="btn btn-primary flex-1" id="btn-confirm-delete-outlet" style="background:var(--danger)">Hapus</button>
+          </div>
+        `);
+
+        setTimeout(() => {
+          document.getElementById('btn-confirm-delete-outlet').addEventListener('click', async () => {
+            const res = await deleteOutlet(id);
+            if (res.error) {
+              showToast('⚠ Gagal menghapus cabang: ' + res.error);
+            } else {
+              showToast('🏢 Cabang berhasil dihapus');
+              closeModal();
+              navigateTo('manage_outlets');
+            }
+          });
+        }, 50);
+      });
+    });
   }
 
   if (page === 'pos') {

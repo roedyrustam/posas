@@ -406,7 +406,7 @@ erDiagram
 ### Phase 4 — Scale (Minggu 7+)
 > Fitur untuk **scaling bisnis**
 
-- [ ] Multi-outlet support
+- [x] Multi-outlet support
 - [x] Team management (roles: Owner, Kasir, Manajer)
 - [x] Advanced analytics (Chart.js)
 - [x] Subscription billing (Free → Pro)
