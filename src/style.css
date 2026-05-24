@@ -27,6 +27,50 @@
   --topbar-height: 56px;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --font: 'Inter', -apple-system, system-ui, sans-serif;
+
+  /* Spacing System (HIG Harmony) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+
+  /* Skala Tipografi Hierarkis (HIG Hierarchy) */
+  --text-xs: 0.6875rem;   /* 11px */
+  --text-sm: 0.8125rem;   /* 13px */
+  --text-base: 0.875rem;  /* 14px */
+  --text-md: 0.9375rem;   /* 15px */
+  --text-lg: 1rem;        /* 16px */
+  --text-xl: 1.125rem;    /* 18px */
+  --text-2xl: 1.25rem;    /* 20px */
+  --text-3xl: 1.5rem;     /* 24px */
+  --text-4xl: 1.75rem;    /* 28px */
+  --text-display: 2rem;   /* 32px */
+
+  /* Easing & Durasi Natural (HIG Harmony) */
+  --ease-enter: cubic-bezier(0.0, 0.0, 0.2, 1);
+  --ease-exit: cubic-bezier(0.4, 0.0, 1.0, 1);
+  --ease-normal: cubic-bezier(0.4, 0.0, 0.2, 1);
+  --duration-normal: 250ms;
+}
+
+/* Mode Gelap Premium (Slate-based HIG Harmony & Consistency) */
+.dark-theme {
+  --bg-primary: #0f172a;       /* Slate 900 */
+  --bg-secondary: #1e293b;     /* Slate 800 */
+  --bg-card: #1e293b;          /* Slate 800 */
+  --bg-elevated: #334155;      /* Slate 700 */
+  --bg-glass: rgba(15, 23, 42, 0.85);
+  --text-primary: #f8fafc;     /* Slate 50 */
+  --text-secondary: #cbd5e1;   /* Slate 300 */
+  --text-muted: #64748b;       /* Slate 500 */
+  --border: rgba(255, 255, 255, 0.08);
+  --accent-glow: rgba(99, 102, 241, 0.25);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.5);
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -48,7 +92,7 @@ body {
 .splash-screen {
   position: fixed; inset: 0; z-index: 9999;
   display: flex; align-items: center; justify-content: center;
-  background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 50%, #f8fafc 100%);
+  background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-elevated) 50%, var(--bg-primary) 100%);
   animation: splashFade 0.5s ease 2s forwards;
 }
 .splash-logo { text-align: center; }
@@ -388,9 +432,9 @@ body {
 .truncate { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* ===== Animations ===== */
-.fade-in { animation: fadeIn 0.35s ease; }
+.fade-in { animation: fadeIn var(--duration-normal) var(--ease-enter); }
 @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
-.slide-up { animation: slideUp 0.35s cubic-bezier(0.4,0,0.2,1); }
+.slide-up { animation: slideUp var(--duration-normal) var(--ease-enter); }
 @keyframes slideUp { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:translateY(0)} }
 
 /* ===== Scrollbar ===== */
@@ -403,7 +447,7 @@ body {
   min-height: 100dvh;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   padding: 24px 20px;
-  background: linear-gradient(160deg, #f8fafc 0%, #eef2ff 40%, #f8fafc 100%);
+  background: linear-gradient(160deg, var(--bg-primary) 0%, var(--bg-elevated) 40%, var(--bg-primary) 100%);
   position: relative; overflow: hidden;
 }
 .auth-screen::before {

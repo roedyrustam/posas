@@ -808,6 +808,8 @@ export function renderAppearance() {
     { name: 'Slate', hex: '#64748b' }
   ];
 
+  const currentTheme = branding.theme || 'dark';
+
   return `
   <div class="fade-in">
     <div class="section">
@@ -818,7 +820,7 @@ export function renderAppearance() {
           <div class="color-picker-item ${branding.accent === c.hex ? 'active' : ''}" 
                data-color="${c.hex}" 
                style="background:${c.hex}; height:60px; border-radius:var(--radius-md); cursor:pointer; position:relative; border: 2px solid transparent">
-            ${branding.accent === c.hex ? '<span class="material-icons-round" style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); color:white">check</span>' : ''}
+             ${branding.accent === c.hex ? '<span class="material-icons-round" style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); color:white">check</span>' : ''}
           </div>
         `).join('')}
       </div>
@@ -826,14 +828,21 @@ export function renderAppearance() {
 
     <div class="section">
       <div class="section-header"><span class="section-title">Tema Aplikasi</span></div>
-      <div class="card flex items-center justify-between p-16">
-        <div class="flex items-center gap-12">
-          <span class="material-icons-round text-muted">dark_mode</span>
-          <div class="list-title">Mode Gelap</div>
+      <p class="text-sm text-muted mb-16">Pilih tema antarmuka yang paling nyaman untuk Anda.</p>
+      <div class="grid-2" style="gap: 12px;">
+        <div class="card theme-picker-item ${currentTheme === 'light' ? 'active' : ''}" 
+             data-theme="light" 
+             style="cursor:pointer; display:flex; align-items:center; gap:12px; padding:16px; border:2px solid ${currentTheme === 'light' ? 'var(--accent)' : 'var(--border)'}">
+          <span class="material-icons-round text-muted">light_mode</span>
+          <span class="fw-700">Mode Terang</span>
         </div>
-        <span class="badge badge-success">Aktif</span>
+        <div class="card theme-picker-item ${currentTheme === 'dark' ? 'active' : ''}" 
+             data-theme="dark" 
+             style="cursor:pointer; display:flex; align-items:center; gap:12px; padding:16px; border:2px solid ${currentTheme === 'dark' ? 'var(--accent)' : 'var(--border)'}">
+          <span class="material-icons-round text-muted">dark_mode</span>
+          <span class="fw-700">Mode Gelap</span>
+        </div>
       </div>
-      <p class="text-xs text-muted mt-8">Mode terang akan tersedia di versi mendatang.</p>
     </div>
 
     <button class="btn btn-primary btn-block mt-24" id="btn-save-appearance">
@@ -962,7 +971,7 @@ export function renderReports() {
                     <span class="fw-600">${p.name}</span>
                     <span class="text-muted">${p.count} terjual</span>
                   </div>
-                  <div style="height:8px; background:var(--bg-light); border-radius:4px; overflow:hidden">
+                  <div style="height:8px; background:var(--bg-elevated); border-radius:4px; overflow:hidden">
                     <div style="height:100%; width:${percentage}%; background:var(--accent); border-radius:4px"></div>
                   </div>
                 </div>`;

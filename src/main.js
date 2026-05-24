@@ -169,6 +169,16 @@ function applyBranding() {
   // Apply accent color to CSS variables
   document.documentElement.style.setProperty('--accent', branding.accent);
   
+  // Apply theme class (HIG Harmony & Consistency)
+  const theme = branding.theme || 'dark';
+  document.documentElement.classList.toggle('dark-theme', theme === 'dark');
+  
+  // Update theme-color meta tag
+  const metaTheme = document.querySelector('meta[name="theme-color"]');
+  if (metaTheme) {
+    metaTheme.setAttribute('content', theme === 'dark' ? '#0f172a' : '#f8fafc');
+  }
+
   // Update store name in header and drawer if needed
   const outlet = outlets.find(o => o.id === activeOutlet);
   const displayName = branding.storeName + (outlet ? ` - ${outlet.name}` : '');
@@ -1266,24 +1276,41 @@ function bindPageEvents(page) {
 
   // === Branding Events ===
   if (page === 'appearance') {
+    // Color picker
     document.querySelectorAll('.color-picker-item').forEach(item => {
       item.addEventListener('click', () => {
-        document.querySelectorAll('.color-picker-item').forEach(i => i.classList.remove('active'));
+        document.querySelectorAll('.color-picker-item').forEach(i => {
+          i.classList.remove('active');
+          i.innerHTML = '';
+        });
         item.classList.add('active');
         item.innerHTML = '<span class="material-icons-round" style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); color:white">check</span>';
+      });
+    });
+
+    // Theme picker (HIG Harmony)
+    let selectedTheme = branding.theme || 'dark';
+    document.querySelectorAll('.theme-picker-item').forEach(item => {
+      item.addEventListener('click', () => {
+        document.querySelectorAll('.theme-picker-item').forEach(i => {
+          i.classList.remove('active');
+          i.style.borderColor = 'var(--border)';
+        });
+        item.classList.add('active');
+        item.style.borderColor = 'var(--accent)';
+        selectedTheme = item.dataset.theme;
       });
     });
 
     const saveBtn = document.getElementById('btn-save-appearance');
     if (saveBtn) saveBtn.addEventListener('click', async () => {
       const activeColor = document.querySelector('.color-picker-item.active');
-      if (activeColor) {
-        const accent = activeColor.dataset.color;
-        await updateBranding({ accent });
-        applyBranding();
-        showToast('Tema warna berhasil diperbarui 🎨');
-        navigateTo('settings');
-      }
+      const accent = activeColor ? activeColor.dataset.color : branding.accent;
+      
+      await updateBranding({ accent, theme: selectedTheme });
+      applyBranding();
+      showToast('Tampilan berhasil diperbarui 🎨');
+      navigateTo('settings');
     });
   }
 
@@ -1397,6 +1424,11 @@ function initCharts(page) {
   const labels = weeklyData.map(d => d.day);
   const amounts = weeklyData.map(d => d.amount);
 
+  const isDark = document.documentElement.classList.contains('dark-theme');
+  const textColor = isDark ? '#94a3b8' : '#475569';
+  const gridColor = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.08)';
+  const accentColor = branding.accent || '#6366f1';
+
   new Chart(canvas, {
     type: config.type,
     data: {
@@ -1404,8 +1436,8 @@ function initCharts(page) {
       datasets: [{
         label: 'Pendapatan (Rp)',
         data: amounts,
-        backgroundColor: page === 'dashboard' ? 'rgba(99, 102, 241, 0.2)' : 'rgba(99, 102, 241, 0.8)',
-        borderColor: '#6366f1',
+        backgroundColor: page === 'dashboard' ? `${accentColor}22` : accentColor,
+        borderColor: accentColor,
         borderWidth: 2,
         tension: 0.4,
         fill: page === 'dashboard',
@@ -1418,7 +1450,10 @@ function initCharts(page) {
       plugins: { legend: { display: false } },
       scales: {
         y: { beginAtZero: true, grid: { display: false }, ticks: { display: false } },
-        x: { grid: { display: false } }
+        x: { 
+          grid: { display: false },
+          ticks: { color: textColor, font: { family: 'Inter', weight: '600' } }
+        }
       }
     }
   });
