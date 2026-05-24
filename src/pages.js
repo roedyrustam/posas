@@ -603,6 +603,7 @@ export function renderPricing() {
 // ===== SETTINGS =====
 export function renderSettings() {
   const user = getCurrentUser() || { name: 'Pengguna', email: '', storeName: 'Toko Saya', plan: 'free' };
+  const isPro = user.plan === 'pro';
   const initials = getInitials(user.name);
 
   return `
