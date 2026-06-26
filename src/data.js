@@ -142,7 +142,7 @@ const DEFAULT_BRANDING = {
   storeEmoji: '🏪',
   receiptHeader: 'Terima kasih telah berbelanja!',
   receiptFooter: 'Silakan berkunjung kembali.',
-  theme: 'dark' // currently only dark is fully supported by CSS
+  theme: 'light'
 };
 export let branding = { ...DEFAULT_BRANDING };
 
@@ -168,7 +168,7 @@ export function initializeTenantData() {
       storeEmoji: '🏪',
       receiptHeader: 'Terima kasih telah berbelanja!',
       receiptFooter: 'Silakan berkunjung kembali.',
-      theme: 'dark'
+      theme: 'light'
     });
   }
 
@@ -213,7 +213,7 @@ export function initializeTenantData() {
       storeEmoji: '🏪',
       receiptHeader: 'Terima kasih telah berbelanja!',
       receiptFooter: 'Silakan berkunjung kembali.',
-      theme: 'dark'
+      theme: 'light'
     });
   }
 }
@@ -432,7 +432,7 @@ export async function deleteCustomer(id) {
 }
 
 // --- Transactions ---
-export async function addTransaction({ items, total, customer, method, cartItems }) {
+export async function addTransaction({ items, total, customer, method, cartItems, discount, tax, subtotal }) {
   const session = getSession();
   const user = (await supabase.auth.getUser()).data.user;
   if (!user) return null;
@@ -457,7 +457,10 @@ export async function addTransaction({ items, total, customer, method, cartItems
     customer_name: customer || 'Walk-in',
     method: method || 'Tunai',
     raw_items: cartItems, // For deep reporting
-    outletId: activeOutlet || 'o1'
+    outletId: activeOutlet || 'o1',
+    discount: Number(discount) || 0,
+    tax: Number(tax) || 0,
+    subtotal: Number(subtotal) || Number(total)
   };
 
   // For local UI consistency
@@ -475,7 +478,10 @@ export async function addTransaction({ items, total, customer, method, cartItems
       total: txn.total,
       customer_name: txn.customer_name,
       method: txn.method,
-      outlet_id: activeOutlet || 'o1'
+      outlet_id: activeOutlet || 'o1',
+      discount: txn.discount,
+      tax: txn.tax,
+      subtotal: txn.subtotal
     });
     if (txErr) throw txErr;
 
@@ -512,7 +518,10 @@ export async function addTransaction({ items, total, customer, method, cartItems
       method: txn.method,
       outlet_id: activeOutlet || 'o1',
       created_at: txn.created_at,
-      cartItems: cartItems
+      cartItems: cartItems,
+      discount: txn.discount,
+      tax: txn.tax,
+      subtotal: txn.subtotal
     });
     localStorage.setItem('posas_offline_transactions', JSON.stringify(queue));
   }
@@ -804,7 +813,7 @@ export async function seedDefaultDataForTenant(userId, tenantId, email, storeNam
     storeEmoji: '🏪',
     receiptHeader: 'Terima kasih telah berbelanja!',
     receiptFooter: 'Silakan berkunjung kembali.',
-    theme: 'dark'
+    theme: 'light'
   });
 
   // Load into memory arrays
