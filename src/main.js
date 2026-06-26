@@ -12,7 +12,7 @@ import {
   renderManageOutlets, renderAdminPortal
 } from './pages.js';
 import { getWeeklyRevenue } from './data.js';
-import { checkRateLimit, incrementUsage, fetchGlobalTenants, toggleTenantPlanCloud, fetchGlobalAuditLogs, hashColor, getInitials } from './data.js';
+import { checkRateLimit, incrementUsage, fetchGlobalTenants, toggleTenantPlanCloud, fetchGlobalAuditLogs, hashColor, getInitials, updateProduct, updateCustomer, deleteInvoice, deleteBooking } from './data.js';
 
 let selectedPOSCustomer = null;
 

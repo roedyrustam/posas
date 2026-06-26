@@ -610,6 +610,15 @@ export async function updateBookingStatus(id, status) {
   return bk;
 }
 
+export async function deleteBooking(id) {
+  const idx = bookings.findIndex(b => b.id === id);
+  if (idx > -1) { 
+    bookings.splice(idx, 1); 
+    saveJSON(KEYS.bookings, bookings); 
+    await supabase.from('bookings').delete().eq('id', id);
+  }
+}
+
 // --- Scoped Filtering Getters ---
 export function getFilteredProducts() {
   if (activeOutlet === 'all') return products;

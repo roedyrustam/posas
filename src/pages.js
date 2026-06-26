@@ -196,7 +196,7 @@ export function renderProducts() {
 
     <div class="grid-1">
       ${filteredProducts.map(p => `
-        <div class="card flex items-center gap-12" style="padding:14px 16px">
+        <div class="card flex items-center gap-12 product-item" data-id="${p.id}" style="padding:14px 16px; cursor:pointer">
           <div style="font-size:32px;flex-shrink:0">${p.emoji}</div>
           <div class="list-content">
             <div class="list-title">${p.name}</div>
@@ -349,9 +349,14 @@ export function renderBooking() {
             <div class="list-title">${b.customerName}</div>
             <div class="list-subtitle">${b.service} · ${b.date} ${b.time}</div>
           </div>
-          <button class="icon-btn btn-complete-booking" data-id="${b.id}" aria-label="Selesai">
-            <span class="material-icons-round" style="color:var(--success)">check_circle</span>
-          </button>
+          <div class="flex gap-4">
+            <button class="icon-btn btn-complete-booking" data-id="${b.id}" aria-label="Selesai">
+              <span class="material-icons-round" style="color:var(--success)">check_circle</span>
+            </button>
+            <button class="icon-btn btn-delete-booking" data-id="${b.id}" aria-label="Hapus">
+              <span class="material-icons-round" style="color:var(--danger)">delete</span>
+            </button>
+          </div>
         </div>`).join('')}
       </div>
     </div>` : ''}
@@ -365,7 +370,12 @@ export function renderBooking() {
             <div class="list-title">${b.customerName}</div>
             <div class="list-subtitle">${b.service} · ${b.date} ${b.time}</div>
           </div>
-          <span class="badge badge-success">${b.status === 'completed' ? 'Selesai' : 'Batal'}</span>
+          <div class="flex items-center gap-8">
+            <span class="badge badge-success">${b.status === 'completed' ? 'Selesai' : 'Batal'}</span>
+            <button class="icon-btn btn-delete-booking" data-id="${b.id}" aria-label="Hapus" style="width:24px;height:24px;padding:0">
+              <span class="material-icons-round" style="color:var(--danger);font-size:16px">delete</span>
+            </button>
+          </div>
         </div>`).join('')}
       </div>
     </div>` : ''}
