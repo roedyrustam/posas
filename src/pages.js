@@ -200,10 +200,11 @@ export function renderProducts() {
           <div style="font-size:32px;flex-shrink:0">${p.emoji}</div>
           <div class="list-content">
             <div class="list-title">${p.name}</div>
-            <div class="list-subtitle">${p.category}</div>
+            <div class="list-subtitle">${p.category}${p.sku ? ` · SKU: <code style="background:var(--bg-elevated);padding:2px 4px;border-radius:4px">${p.sku}</code>` : ''}</div>
           </div>
           <div class="list-trailing">
             <div class="list-amount">${formatRupiah(p.price)}</div>
+            <div class="text-xs text-muted" style="margin-top:2px;font-size:10px">${p.cost_price ? `HPP: ${formatRupiah(p.cost_price)}` : 'HPP: Rp 0'}</div>
             <span class="badge ${p.stock < 20 ? 'badge-warning' : 'badge-success'}" style="margin-top:4px">
               ${p.stock < 20 ? '⚠ ' : ''}${p.stock} stok
             </span>

@@ -1452,6 +1452,21 @@ function bindPageEvents(page) {
       }, 50);
     });
 
+    const customerSearch = document.getElementById('customer-search');
+    if (customerSearch) {
+      customerSearch.addEventListener('input', (e) => {
+        const q = e.target.value.toLowerCase();
+        document.querySelectorAll('.customer-item').forEach(el => {
+          const id = el.dataset.id;
+          const c = customers.find(cu => cu.id === id);
+          if (c) {
+            const matches = c.name.toLowerCase().includes(q) || (c.phone && c.phone.includes(q)) || (c.email && c.email.toLowerCase().includes(q));
+            el.style.display = matches ? '' : 'none';
+          }
+        });
+      });
+    }
+
     document.querySelectorAll('.customer-item').forEach(item => {
       item.addEventListener('click', () => {
         const id = item.dataset.id;
@@ -1622,6 +1637,22 @@ function bindPageEvents(page) {
     if (addBtn) {
       addBtn.addEventListener('click', () => {
         showProductModal();
+      });
+    }
+
+    // Product Search (by Name, SKU, and Category)
+    const productSearch = document.getElementById('product-search');
+    if (productSearch) {
+      productSearch.addEventListener('input', (e) => {
+        const q = e.target.value.toLowerCase();
+        document.querySelectorAll('.product-item').forEach(el => {
+          const id = el.dataset.id;
+          const p = products.find(pr => pr.id === id);
+          if (p) {
+            const matches = p.name.toLowerCase().includes(q) || (p.sku && p.sku.toLowerCase().includes(q)) || p.category.toLowerCase().includes(q);
+            el.style.display = matches ? '' : 'none';
+          }
+        });
       });
     }
 
