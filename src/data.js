@@ -783,7 +783,7 @@ export function canAccess(action) {
   
   // Platform Super Admin restriction
   if (action === 'admin_portal') {
-    return user.email === 'admin@posas.id' || user.role.toLowerCase() === 'superadmin';
+    return user.email === 'admin@posas.com' || user.email === 'admin@posas.id' || user.role.toLowerCase() === 'superadmin';
   }
   
   const permissions = {

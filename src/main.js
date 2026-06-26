@@ -203,7 +203,7 @@ function applyBranding() {
   const user = getCurrentUser();
   const drawerAdmin = $('drawer-admin-portal');
   if (drawerAdmin) {
-    const isPlatformAdmin = user && (user.role === 'superadmin' || user.email === 'admin@posas.id');
+    const isPlatformAdmin = user && (user.role === 'superadmin' || user.email === 'admin@posas.com' || user.email === 'admin@posas.id');
     drawerAdmin.classList.toggle('hidden', !isPlatformAdmin);
   }
 }
