@@ -82,16 +82,16 @@ export const tenant = {
 
 // --- Default Seed Data ---
 const DEFAULT_PRODUCTS = [
-  { id: 'p1', name: 'Kopi Susu', price: 18000, stock: 45, category: 'Minuman', emoji: '☕' },
-  { id: 'p2', name: 'Nasi Goreng', price: 25000, stock: 30, category: 'Makanan', emoji: '🍛' },
-  { id: 'p3', name: 'Es Teh Manis', price: 8000, stock: 60, category: 'Minuman', emoji: '🧊' },
-  { id: 'p4', name: 'Roti Bakar', price: 15000, stock: 20, category: 'Makanan', emoji: '🍞' },
-  { id: 'p5', name: 'Jus Alpukat', price: 22000, stock: 15, category: 'Minuman', emoji: '🥑' },
-  { id: 'p6', name: 'Mie Ayam', price: 20000, stock: 25, category: 'Makanan', emoji: '🍜' },
-  { id: 'p7', name: 'Ayam Geprek', price: 28000, stock: 18, category: 'Makanan', emoji: '🍗' },
-  { id: 'p8', name: 'Matcha Latte', price: 24000, stock: 12, category: 'Minuman', emoji: '🍵' },
-  { id: 'p9', name: 'Brownies', price: 12000, stock: 35, category: 'Snack', emoji: '🍫' },
-  { id: 'p10', name: 'Pisang Goreng', price: 10000, stock: 40, category: 'Snack', emoji: '🍌' },
+  { id: 'p1', name: 'Kopi Susu', price: 18000, stock: 45, category: 'Minuman', emoji: '☕', sku: 'KS-001', cost_price: 10000 },
+  { id: 'p2', name: 'Nasi Goreng', price: 25000, stock: 30, category: 'Makanan', emoji: '🍛', sku: 'NG-002', cost_price: 15000 },
+  { id: 'p3', name: 'Es Teh Manis', price: 8000, stock: 60, category: 'Minuman', emoji: '🧊', sku: 'ET-003', cost_price: 3000 },
+  { id: 'p4', name: 'Roti Bakar', price: 15000, stock: 20, category: 'Makanan', emoji: '🍞', sku: 'RB-004', cost_price: 8000 },
+  { id: 'p5', name: 'Jus Alpukat', price: 22000, stock: 15, category: 'Minuman', emoji: '🥑', sku: 'JA-005', cost_price: 12000 },
+  { id: 'p6', name: 'Mie Ayam', price: 20000, stock: 25, category: 'Makanan', emoji: '🍜', sku: 'MA-006', cost_price: 11000 },
+  { id: 'p7', name: 'Ayam Geprek', price: 28000, stock: 18, category: 'Makanan', emoji: '🍗', sku: 'AG-007', cost_price: 16000 },
+  { id: 'p8', name: 'Matcha Latte', price: 24000, stock: 12, category: 'Minuman', emoji: '🍵', sku: 'ML-008', cost_price: 13000 },
+  { id: 'p9', name: 'Brownies', price: 12000, stock: 35, category: 'Snack', emoji: '🍫', sku: 'BR-009', cost_price: 6000 },
+  { id: 'p10', name: 'Pisang Goreng', price: 10000, stock: 40, category: 'Snack', emoji: '🍌', sku: 'PG-010', cost_price: 5000 },
 ];
 
 const DEFAULT_CUSTOMERS = [
@@ -240,7 +240,9 @@ export async function syncCloudData() {
       products.length = 0; 
       products.push(...p.data.map(item => ({
         ...item,
-        outletId: item.outletId || item.outlet_id || 'o1'
+        outletId: item.outletId || item.outlet_id || 'o1',
+        sku: item.sku || '',
+        cost_price: Number(item.cost_price) || 0
       }))); 
       saveJSON(KEYS.products, products); 
     }
@@ -293,7 +295,7 @@ export async function syncCloudData() {
 if (!localStorage.getItem(KEYS.products)) saveJSON(KEYS.products, products);
 
 // --- CRUD: Products ---
-export async function addProduct({ name, price, stock, category, emoji }) {
+export async function addProduct({ name, price, stock, category, emoji, sku, cost_price }) {
   const session = getSession();
   if (!session) return { error: 'Unauthorized' };
 
@@ -315,7 +317,9 @@ export async function addProduct({ name, price, stock, category, emoji }) {
     stock: Number(stock),
     category,
     emoji: emoji || '📦',
-    outletId: activeOutlet || 'o1'
+    outletId: activeOutlet || 'o1',
+    sku: sku || '',
+    cost_price: Number(cost_price) || 0
   };
 
   products.unshift(product);

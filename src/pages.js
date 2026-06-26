@@ -775,7 +775,7 @@ export function renderSettings() {
       Keluar
     </button>
 
-    <p class="text-sm text-muted" style="text-align:center">POSAS v1.0.0 · Paket ${user.plan === 'free' ? 'Gratis' : 'Premium'}</p>
+    <p class="text-sm text-muted" style="text-align:center">KasirPro v1.0.0 · Paket ${user.plan === 'free' ? 'Gratis' : 'Premium'}</p>
   </div>`;
 }
 
@@ -999,7 +999,7 @@ export function renderReports() {
     <div class="card mb-24 p-20 text-center" style="background:linear-gradient(135deg, var(--accent), var(--accent-light)); color:white">
       <span class="material-icons-round mb-12" style="font-size:40px">insights</span>
       <h3 class="fw-700 mb-8">Buka Analisis Mendalam</h3>
-      <p class="text-sm opacity-80 mb-16">Dapatkan insight produk terlaris dan pelanggan VIP Anda dengan POSAS Pro.</p>
+      <p class="text-sm opacity-80 mb-16">Dapatkan insight produk terlaris dan pelanggan VIP Anda dengan KasirPro Pro.</p>
       <button class="btn btn-white btn-sm" onclick="navigateTo('pricing')">Lihat Paket Pro</button>
     </div>` : ''}
 
@@ -1207,7 +1207,7 @@ export function renderAdminPortal() {
     <div class="mb-24 mt-8 flex justify-between items-center" style="flex-wrap: wrap; gap: 12px;">
       <div>
         <h2 class="fw-800" style="font-size:24px">Portal Super Admin 👑</h2>
-        <p class="text-muted text-sm">Dashboard Global Platform Management POSAS</p>
+        <p class="text-muted text-sm">Dashboard Global Platform Management KasirPro</p>
       </div>
       <button class="btn btn-secondary btn-sm" id="btn-back-to-app" style="border-radius: var(--radius-md)">
         <span class="material-icons-round" style="font-size:16px">arrow_back</span>

@@ -636,7 +636,15 @@ function showProductModal(product = null) {
       <input class="input" id="inp-p-name" placeholder="Contoh: Kopi Susu Gula Aren" value="${isEdit ? product.name : ''}" />
     </div>
     <div class="input-group">
-      <label class="input-label">Harga (Rp) *</label>
+      <label class="input-label">SKU / Barcode</label>
+      <input class="input" id="inp-p-sku" placeholder="Contoh: KS-001" value="${isEdit && product.sku ? product.sku : ''}" />
+    </div>
+    <div class="input-group">
+      <label class="input-label">Harga Beli / HPP (Rp)</label>
+      <input class="input" id="inp-p-cost" type="number" placeholder="Contoh: 10000" value="${isEdit && product.cost_price ? product.cost_price : ''}" />
+    </div>
+    <div class="input-group">
+      <label class="input-label">Harga Jual (Rp) *</label>
       <input class="input" id="inp-p-price" type="number" placeholder="Contoh: 15000" value="${isEdit ? product.price : ''}" />
     </div>
     <div class="input-group">
@@ -667,13 +675,15 @@ function showProductModal(product = null) {
     const saveBtn = document.getElementById('btn-save-product');
     if (saveBtn) saveBtn.addEventListener('click', async () => {
       const name = document.getElementById('inp-p-name').value.trim();
+      const sku = document.getElementById('inp-p-sku').value.trim();
+      const cost_price = Number(document.getElementById('inp-p-cost').value) || 0;
       const price = Number(document.getElementById('inp-p-price').value);
       const stock = Number(document.getElementById('inp-p-stock').value);
       const category = document.getElementById('inp-p-cat').value;
       const errEl = document.getElementById('p-form-error');
 
       if (!name || isNaN(price) || isNaN(stock)) {
-        errEl.textContent = 'Nama, Harga, dan Stok wajib diisi.';
+        errEl.textContent = 'Nama, Harga Jual, dan Stok wajib diisi.';
         errEl.style.display = 'block';
         return;
       }
@@ -682,12 +692,12 @@ function showProductModal(product = null) {
       saveBtn.innerHTML = '<span class="material-icons-round spin">sync</span> Menyimpan...';
 
       if (isEdit) {
-        await updateProduct(product.id, { name, price, stock, category });
-        addLog('Edit Produk', `Ubah produk: ${name} (Harga: ${price}, Stok: ${stock})`);
+        await updateProduct(product.id, { name, price, stock, category, sku, cost_price });
+        addLog('Edit Produk', `Ubah produk: ${name} (Harga Jual: ${price}, SKU: ${sku}, HPP: ${cost_price}, Stok: ${stock})`);
         showToast(`✅ Produk ${name} berhasil diperbarui`);
       } else {
-        await addProduct({ name, price, stock, category });
-        addLog('Tambah Produk', `Produk baru: ${name} (Stok: ${stock})`);
+        await addProduct({ name, price, stock, category, sku, cost_price });
+        addLog('Tambah Produk', `Produk baru: ${name} (Stok: ${stock}, SKU: ${sku}, HPP: ${cost_price})`);
         showToast(`✅ Produk ${name} berhasil ditambahkan`);
       }
       closeModal();
