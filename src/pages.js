@@ -971,6 +971,23 @@ export function renderReports() {
   const topProducts = getTopProducts(5);
   const topCustomers = getTopCustomers(5);
 
+  const filteredTxns = getFilteredTransactions();
+  const totalOmzet = filteredTxns.reduce((sum, t) => sum + Number(t.total || 0), 0);
+  const totalDiskon = filteredTxns.reduce((sum, t) => sum + Number(t.discount || 0), 0);
+  const totalPajak = filteredTxns.reduce((sum, t) => sum + Number(t.tax || 0), 0);
+  const totalSubtotal = filteredTxns.reduce((sum, t) => sum + Number(t.subtotal || t.total || 0), 0);
+  
+  // Calculate total HPP (cost of goods sold) from raw_items
+  const totalHpp = filteredTxns.reduce((sum, t) => {
+    if (t.raw_items && Array.isArray(t.raw_items)) {
+      return sum + t.raw_items.reduce((s, item) => s + (Number(item.cost_price || 0) * Number(item.qty || 1)), 0);
+    }
+    // Fallback estimate for legacy orders
+    return sum + (Number(t.total || 0) * 0.5);
+  }, 0);
+
+  const labaKotor = Math.max(0, totalSubtotal - totalDiskon - totalHpp);
+
   return `
   <div class="fade-in">
     <div class="flex items-center justify-between mb-24">
@@ -979,6 +996,33 @@ export function renderReports() {
         <span class="material-icons-round" style="font-size:18px">download</span>
         Ekspor CSV
       </button>
+    </div>
+
+    <!-- Summary Metrics Grid (SaaS POS Standard) -->
+    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 24px;">
+      <div class="card p-12 flex flex-col justify-between" style="border-radius: 12px; min-height: 80px">
+        <span class="text-xs text-muted">Omzet Kotor (Subtotal)</span>
+        <span class="fw-800 text-base mt-4">${formatRupiah(totalSubtotal)}</span>
+      </div>
+      <div class="card p-12 flex flex-col justify-between" style="border-radius: 12px; min-height: 80px">
+        <span class="text-xs text-muted">Total Diskon</span>
+        <span class="fw-800 text-base mt-4 text-danger">${totalDiskon > 0 ? '-' : ''}${formatRupiah(totalDiskon)}</span>
+      </div>
+      <div class="card p-12 flex flex-col justify-between" style="border-radius: 12px; min-height: 80px">
+        <span class="text-xs text-muted">Pajak Terkumpul (PPN)</span>
+        <span class="fw-800 text-base mt-4 text-info">${formatRupiah(totalPajak)}</span>
+      </div>
+      <div class="card p-12 flex flex-col justify-between" style="border-radius: 12px; min-height: 80px">
+        <span class="text-xs text-muted">Total Omzet Bersih</span>
+        <span class="fw-800 text-base mt-4 text-success">${formatRupiah(totalOmzet)}</span>
+      </div>
+      <div class="card p-12 flex flex-col justify-between" style="grid-column: span 2; border-radius: 12px; min-height: 80px; background:rgba(34,197,94,0.05); border:1px solid rgba(34,197,94,0.15)">
+        <div class="flex justify-between items-center">
+          <span class="text-xs text-muted fw-600">Estimasi Laba Kotor (Subtotal - HPP)</span>
+          <span class="text-xs text-muted">Total HPP: ${formatRupiah(totalHpp)}</span>
+        </div>
+        <span class="fw-800 text-lg mt-4 text-success">${formatRupiah(labaKotor)}</span>
+      </div>
     </div>
 
     <div class="section mb-24">

@@ -481,7 +481,8 @@ export async function addTransaction({ items, total, customer, method, cartItems
       outlet_id: activeOutlet || 'o1',
       discount: txn.discount,
       tax: txn.tax,
-      subtotal: txn.subtotal
+      subtotal: txn.subtotal,
+      raw_items: cartItems
     });
     if (txErr) throw txErr;
 
@@ -1714,7 +1715,8 @@ export async function syncOfflineTransactions() {
         created_at: txn.created_at,
         discount: txn.discount || 0,
         tax: txn.tax || 0,
-        subtotal: txn.subtotal || txn.total
+        subtotal: txn.subtotal || txn.total,
+        raw_items: txn.cartItems
       });
       if (txError) throw txError;
 
