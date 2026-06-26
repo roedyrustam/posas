@@ -1695,4 +1695,125 @@ export async function handleStripeWebhook(reqBody, signature) {
   return { success: true };
 }
 
+/**
+ * Fetch all registered workspaces/tenants and their owner details from Supabase.
+ */
+export async function fetchGlobalTenants() {
+  try {
+    const { data: workspaces, error: wsError } = await supabase
+      .from('workspaces')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (wsError) throw wsError;
+
+    // Fetch corresponding profiles
+    const { data: profiles, error: profError } = await supabase
+      .from('profiles')
+      .select('id, full_name, email, plan');
+    if (profError) throw profError;
+
+    // Fetch counts from other tables
+    const [prodsRes, txRes] = await Promise.all([
+      supabase.from('products').select('tenant_id'),
+      supabase.from('transactions').select('tenant_id, total')
+    ]);
+
+    const productsList = prodsRes.data || [];
+    const transactionsList = txRes.data || [];
+
+    const profilesMap = new Map(profiles.map(p => [p.id, p]));
+
+    return workspaces.map(ws => {
+      const owner = profilesMap.get(ws.owner_id) || { full_name: 'Pemilik', email: '-' };
+      const tenantProds = productsList.filter(p => p.tenant_id === ws.id);
+      const tenantTxns = transactionsList.filter(t => t.tenant_id === ws.id);
+      const totalRev = tenantTxns.reduce((sum, t) => sum + (Number(t.total) || 0), 0);
+
+      return {
+        id: ws.id,
+        name: ws.name,
+        slug: ws.slug,
+        owner: owner.full_name,
+        email: owner.email,
+        plan: ws.plan,
+        createdAt: new Date(ws.created_at).toISOString().slice(0, 10),
+        productsCount: tenantProds.length,
+        transactionsCount: tenantTxns.length,
+        revenue: totalRev
+      };
+    });
+  } catch (err) {
+    console.error('Failed to fetch global tenants, using local fallback:', err);
+    return getAllTenantsData();
+  }
+}
+
+/**
+ * Toggle plan for a specific tenant in workspaces and profiles tables in Supabase.
+ */
+export async function toggleTenantPlanCloud(tenantId, currentPlan) {
+  const newPlan = currentPlan === 'pro' ? 'free' : 'pro';
+  
+  try {
+    // 1. Update in workspaces table
+    const { error: wsError } = await supabase
+      .from('workspaces')
+      .update({ plan: newPlan })
+      .eq('id', tenantId);
+    if (wsError) throw wsError;
+
+    // 2. Update owner profile plan in profiles table
+    const { data: ws } = await supabase.from('workspaces').select('owner_id').eq('id', tenantId).single();
+    if (ws && ws.owner_id) {
+      await supabase
+        .from('profiles')
+        .update({ plan: newPlan })
+        .eq('id', ws.owner_id);
+    }
+
+    // 3. Update local simulation mapping if exists
+    toggleTenantPlan(tenantId);
+
+    return { success: true, plan: newPlan };
+  } catch (err) {
+    console.error('Failed to toggle plan in cloud:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Fetch global audit logs across all workspaces/tenants from Supabase.
+ */
+export async function fetchGlobalAuditLogs() {
+  try {
+    const { data, error } = await supabase
+      .from('audit_logs')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(50);
+    if (error) throw error;
+
+    // Fetch profiles info for logs
+    const { data: profiles } = await supabase.from('profiles').select('id, full_name, email');
+    const profilesMap = new Map(profiles?.map(p => [p.id, p]) || []);
+
+    return data.map(log => {
+      const user = profilesMap.get(log.user_id) || { full_name: 'System', email: '-' };
+      return {
+        id: log.id,
+        action: log.action,
+        targetTable: log.target_table,
+        recordId: log.record_id,
+        timestamp: log.created_at,
+        user: user.full_name,
+        email: user.email,
+        details: `Table: ${log.target_table} (ID: ${log.record_id})`
+      };
+    });
+  } catch (err) {
+    console.error('Failed to fetch global audit logs, using local fallback:', err);
+    return logs;
+  }
+}
+
 

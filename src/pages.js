@@ -1192,11 +1192,6 @@ export function renderManageOutlets() {
 }
 
 export function renderAdminPortal() {
-  const tenants = getAllTenantsData();
-  const totalRevenue = tenants.reduce((sum, t) => sum + t.revenue, 0);
-  const totalTransactions = tenants.reduce((sum, t) => sum + t.transactionsCount, 0);
-  const totalPro = tenants.filter(t => t.plan === 'pro').length;
-
   return `
   <div class="fade-in">
     <div class="mb-24 mt-8 flex justify-between items-center" style="flex-wrap: wrap; gap: 12px;">
@@ -1210,66 +1205,24 @@ export function renderAdminPortal() {
       </button>
     </div>
 
-    <!-- STATS CARDS GLOBAL (SaaS Multi-Tenant metrics) -->
-    <div class="grid-2 mb-24">
-      <div class="stat-card purple">
-        <div class="stat-icon purple"><span class="material-icons-round">analytics</span></div>
-        <div class="stat-value" style="font-size:20px">${tenants.length} Toko</div>
-        <div class="stat-label">Total Tenant Terdaftar</div>
-      </div>
-      <div class="stat-card green">
-        <div class="stat-icon green"><span class="material-icons-round">payments</span></div>
-        <div class="stat-value" style="font-size:20px">${formatRupiah(totalRevenue)}</div>
-        <div class="stat-label">Total Volume (GMV) Platform</div>
-      </div>
-      <div class="stat-card blue">
-        <div class="stat-icon blue"><span class="material-icons-round">receipt</span></div>
-        <div class="stat-value" style="font-size:20px">${totalTransactions} Pesanan</div>
-        <div class="stat-label">Total Transaksi Platform</div>
-      </div>
-      <div class="stat-card orange">
-        <div class="stat-icon orange"><span class="material-icons-round">stars</span></div>
-        <div class="stat-value" style="font-size:20px">${totalPro} Toko</div>
-        <div class="stat-label">Total Tenant Pro / Premium</div>
-      </div>
+    <!-- Admin Tabs -->
+    <div class="flex gap-8 mb-20" style="border-bottom:1px solid var(--border-color); padding-bottom:8px">
+      <button class="btn btn-sm btn-primary admin-tab-btn active" data-tab="tenants" style="border-radius: 8px; padding: 6px 12px;">
+        <span class="material-icons-round" style="font-size:16px; margin-right:4px; vertical-align: middle">business</span> Tenants
+      </button>
+      <button class="btn btn-sm btn-secondary admin-tab-btn" data-tab="audit" style="border-radius: 8px; padding: 6px 12px;">
+        <span class="material-icons-round" style="font-size:16px; margin-right:4px; vertical-align: middle">receipt_long</span> Global Audit Logs
+      </button>
+      <button class="btn btn-sm btn-secondary admin-tab-btn" data-tab="health" style="border-radius: 8px; padding: 6px 12px;">
+        <span class="material-icons-round" style="font-size:16px; margin-right:4px; vertical-align: middle">health_and_safety</span> System Health
+      </button>
     </div>
 
-    <div class="section">
-      <div class="section-header">
-        <span class="section-title">Manajemen Tenant / Toko</span>
-        <span class="text-xs text-muted">Isolasi Namespace Aktif</span>
-      </div>
-      <div class="grid-1" style="gap:12px">
-        ${tenants.map(t => {
-          const initials = t.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-          return `
-          <div class="card p-16 flex items-center justify-between" style="border-radius:var(--radius-lg); flex-wrap: wrap; gap:16px">
-            <div class="flex items-center gap-12" style="min-width: 250px;">
-              <div class="list-avatar" style="background:${hashColor(t.name)};color:#fff;width:48px;height:48px;border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;font-weight:700">
-                ${initials}
-              </div>
-              <div>
-                <div class="fw-700 text-sm flex items-center gap-8" style="font-size: 15px;">
-                  ${t.name}
-                  <span class="badge ${t.plan === 'pro' ? 'badge-success' : 'badge-warning'}" style="font-size:10px; padding:2px 8px">
-                    ${t.plan.toUpperCase()}
-                  </span>
-                </div>
-                <div class="text-xs text-muted" style="margin-top: 2px;">Pemilik: <b>${t.owner}</b> · ID: <code>${t.id}</code></div>
-                <div class="text-xs text-muted" style="margin-top: 4px; font-weight: 500;">
-                  <span style="color:var(--accent-light)">${t.productsCount}</span> Produk · 
-                  <span style="color:var(--success)">${t.transactionsCount}</span> Transaksi · 
-                  Omzet: <b style="color:var(--text-primary)">${formatRupiah(t.revenue)}</b>
-                </div>
-              </div>
-            </div>
-            <button class="btn ${t.plan === 'pro' ? 'btn-danger' : 'btn-primary'} btn-sm btn-toggle-tenant-plan" 
-                    data-id="${t.id}" 
-                    style="border-radius: var(--radius-sm); padding: 8px 16px; font-size: 12px; font-weight: 600;">
-              ${t.plan === 'pro' ? 'Downgrade ke Free' : 'Upgrade ke Pro 🚀'}
-            </button>
-          </div>`;
-        }).join('')}
+    <div id="admin-tab-content">
+      <!-- Loading Skeleton initially -->
+      <div class="py-40 text-center opacity-50">
+        <span class="material-icons-round spin mb-12" style="font-size:32px">sync</span>
+        <div class="text-sm">Memuat data global platform...</div>
       </div>
     </div>
   </div>`;

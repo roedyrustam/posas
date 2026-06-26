@@ -12,7 +12,7 @@ import {
   renderManageOutlets, renderAdminPortal
 } from './pages.js';
 import { getWeeklyRevenue } from './data.js';
-import { checkRateLimit, incrementUsage } from './data.js';
+import { checkRateLimit, incrementUsage, fetchGlobalTenants, toggleTenantPlanCloud, fetchGlobalAuditLogs } from './data.js';
 
 let selectedPOSCustomer = null;
 
@@ -565,18 +565,225 @@ function bindPageEvents(page) {
       });
     }
 
-    document.querySelectorAll('.btn-toggle-tenant-plan').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const id = btn.dataset.id;
-        const res = toggleTenantPlan(id);
-        if (res.success) {
-          showToast(`Paket tenant berhasil diubah ke ${res.plan.toUpperCase()}! 👑`);
-          navigateTo('admin_portal'); // Re-render to refresh statistics and buttons
-        } else {
-          showToast(res.error || 'Gagal mengubah paket tenant.', 'error');
+    const tabContent = document.getElementById('admin-tab-content');
+    const tabs = document.querySelectorAll('.admin-tab-btn');
+
+    let globalTenants = [];
+    let globalLogs = [];
+
+    async function loadTab(tabName) {
+      tabContent.innerHTML = `
+        <div class="py-40 text-center opacity-50">
+          <span class="material-icons-round spin mb-12" style="font-size:32px">sync</span>
+          <div class="text-sm">Memuat data...</div>
+        </div>
+      `;
+
+      if (tabName === 'tenants') {
+        try {
+          globalTenants = await fetchGlobalTenants();
+          renderTenantsTab(globalTenants);
+        } catch (err) {
+          tabContent.innerHTML = `<div class="text-center p-20 text-danger">Gagal memuat tenants: ${err.message}</div>`;
         }
+      } else if (tabName === 'audit') {
+        try {
+          globalLogs = await fetchGlobalAuditLogs();
+          renderAuditTab(globalLogs);
+        } catch (err) {
+          tabContent.innerHTML = `<div class="text-center p-20 text-danger">Gagal memuat audit logs: ${err.message}</div>`;
+        }
+      } else if (tabName === 'health') {
+        renderHealthTab();
+      }
+    }
+
+    // Initial load
+    loadTab('tenants');
+
+    tabs.forEach(btn => {
+      btn.addEventListener('click', () => {
+        tabs.forEach(t => {
+          t.classList.remove('btn-primary');
+          t.classList.add('btn-secondary');
+          t.classList.remove('active');
+        });
+        btn.classList.remove('btn-secondary');
+        btn.classList.add('btn-primary');
+        btn.classList.add('active');
+        loadTab(btn.dataset.tab);
       });
     });
+
+    function renderTenantsTab(tenants) {
+      const totalRevenue = tenants.reduce((sum, t) => sum + t.revenue, 0);
+      const totalTransactions = tenants.reduce((sum, t) => sum + t.transactionsCount, 0);
+      const totalPro = tenants.filter(t => t.plan === 'pro').length;
+
+      tabContent.innerHTML = `
+        <!-- STATS CARDS GLOBAL -->
+        <div class="grid-2 mb-24">
+          <div class="stat-card purple">
+            <div class="stat-icon purple"><span class="material-icons-round">analytics</span></div>
+            <div class="stat-value" style="font-size:20px">${tenants.length} Toko</div>
+            <div class="stat-label">Total Tenant Terdaftar</div>
+          </div>
+          <div class="stat-card green">
+            <div class="stat-icon green"><span class="material-icons-round">payments</span></div>
+            <div class="stat-value" style="font-size:20px">${formatRupiah(totalRevenue)}</div>
+            <div class="stat-label">Total Volume (GMV) Platform</div>
+          </div>
+          <div class="stat-card blue">
+            <div class="stat-icon blue"><span class="material-icons-round">receipt</span></div>
+            <div class="stat-value" style="font-size:20px">${totalTransactions} Pesanan</div>
+            <div class="stat-label">Total Transaksi Platform</div>
+          </div>
+          <div class="stat-card orange">
+            <div class="stat-icon orange"><span class="material-icons-round">stars</span></div>
+            <div class="stat-value" style="font-size:20px">${totalPro} Toko</div>
+            <div class="stat-label">Total Tenant Pro / Premium</div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-header">
+            <span class="section-title">Manajemen Tenant / Toko</span>
+            <span class="text-xs text-muted">Isolasi Namespace Cloud</span>
+          </div>
+          <div class="grid-1" style="gap:12px">
+            ${tenants.map(t => {
+              const initials = t.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+              return `
+              <div class="card p-16 flex items-center justify-between" style="border-radius:var(--radius-lg); flex-wrap: wrap; gap:16px">
+                <div class="flex items-center gap-12" style="min-width: 250px;">
+                  <div class="list-avatar" style="background:${hashColor(t.name)};color:#fff;width:48px;height:48px;border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;font-weight:700">
+                    ${initials}
+                  </div>
+                  <div>
+                    <div class="fw-700 text-sm flex items-center gap-8" style="font-size: 15px;">
+                      ${t.name}
+                      <span class="badge ${t.plan === 'pro' ? 'badge-success' : 'badge-warning'}" style="font-size:10px; padding:2px 8px">
+                        ${t.plan.toUpperCase()}
+                      </span>
+                    </div>
+                    <div class="text-xs text-muted" style="margin-top: 2px;">Pemilik: <b>${t.owner}</b> (${t.email || '-'}) · ID: <code>${t.id}</code></div>
+                    <div class="text-xs text-muted" style="margin-top: 4px; font-weight: 500;">
+                      <span style="color:var(--accent-light)">${t.productsCount}</span> Produk · 
+                      <span style="color:var(--success)">${t.transactionsCount}</span> Transaksi · 
+                      Omzet: <b style="color:var(--text-primary)">${formatRupiah(t.revenue)}</b>
+                    </div>
+                  </div>
+                </div>
+                <button class="btn ${t.plan === 'pro' ? 'btn-danger' : 'btn-primary'} btn-sm btn-toggle-tenant-plan-cloud" 
+                        data-id="${t.id}" data-plan="${t.plan}"
+                        style="border-radius: var(--radius-sm); padding: 8px 16px; font-size: 12px; font-weight: 600;">
+                  ${t.plan === 'pro' ? 'Downgrade ke Free' : 'Upgrade ke Pro 🚀'}
+                </button>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>
+      `;
+
+      // Bind toggle plan action
+      document.querySelectorAll('.btn-toggle-tenant-plan-cloud').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const id = btn.dataset.id;
+          const currentPlan = btn.dataset.plan;
+          
+          btn.disabled = true;
+          btn.innerHTML = '<span class="material-icons-round spin" style="font-size:14px">sync</span> Updating...';
+          
+          const res = await toggleTenantPlanCloud(id, currentPlan);
+          if (res.success) {
+            showToast(`Paket tenant berhasil diubah ke ${res.plan.toUpperCase()}! 👑`);
+            loadTab('tenants'); // Reload tenants tab
+          } else {
+            showToast(res.error || 'Gagal mengubah paket tenant.', 'error');
+            btn.disabled = false;
+            btn.textContent = currentPlan === 'pro' ? 'Downgrade ke Free' : 'Upgrade ke Pro 🚀';
+          }
+        });
+      });
+    }
+
+    function renderAuditTab(logsList) {
+      tabContent.innerHTML = `
+        <div class="section">
+          <div class="section-header">
+            <span class="section-title">Audit Logs Platform (50 Aksi Terakhir)</span>
+            <span class="text-xs text-muted">Jejak Audit Seluruh Tenant</span>
+          </div>
+          <div class="card" style="padding:0">
+            ${logsList.length > 0 ? logsList.map(log => `
+              <div class="list-item" style="border-bottom:1px solid var(--border-color); padding:12px 16px; flex-direction:column; align-items:flex-start; gap:4px">
+                <div class="flex justify-between items-center w-full">
+                  <div class="flex items-center gap-8">
+                    <span class="material-icons-round text-accent" style="font-size:16px">info</span>
+                    <span class="fw-700 text-sm">${log.action}</span>
+                  </div>
+                  <span class="text-xs text-muted">${new Date(log.timestamp).toLocaleString('id-ID')}</span>
+                </div>
+                <div class="text-xs text-muted">Oleh: <b>${log.user}</b> (${log.email})</div>
+                <div class="text-xs text-muted" style="background:var(--bg-elevated); padding:4px 8px; border-radius:4px; width:100%; margin-top:4px">${log.details}</div>
+              </div>
+            `).join('') : '<div class="p-24 text-center text-muted">Belum ada riwayat aktivitas platform</div>'}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderHealthTab() {
+      tabContent.innerHTML = `
+        <div class="section mb-24">
+          <div class="section-header">
+            <span class="section-title">Status Layanan & Konektivitas</span>
+          </div>
+          <div class="card p-16">
+            <div class="flex justify-between items-center mb-16">
+              <span class="text-sm fw-600">Database (PostgreSQL Supabase)</span>
+              <span class="badge badge-success flex items-center gap-4"><span class="material-icons-round" style="font-size:12px">check_circle</span> Sehat (Healthy)</span>
+            </div>
+            <div class="flex justify-between items-center mb-16">
+              <span class="text-sm fw-600">Layanan Otentikasi (Auth)</span>
+              <span class="badge badge-success flex items-center gap-4"><span class="material-icons-round" style="font-size:12px">check_circle</span> Aktif (Online)</span>
+            </div>
+            <div class="flex justify-between items-center mb-16">
+              <span class="text-sm fw-600">Penyimpanan Cache (Local Store)</span>
+              <span class="badge badge-success flex items-center gap-4"><span class="material-icons-round" style="font-size:12px">check_circle</span> Berfungsi</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-sm fw-600">Vite Dev Server</span>
+              <span class="badge badge-success flex items-center gap-4"><span class="material-icons-round" style="font-size:12px">check_circle</span> Aktif (Port 5173)</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-header">
+            <span class="section-title">Informasi Sistem Platform</span>
+          </div>
+          <div class="card p-16 text-sm">
+            <div class="flex justify-between py-8" style="border-bottom: 1px solid var(--border-color)">
+              <span class="text-muted">Versi Platform</span>
+              <span class="fw-700">POSAS v1.0.0 (SaaS Mode)</span>
+            </div>
+            <div class="flex justify-between py-8" style="border-bottom: 1px solid var(--border-color)">
+              <span class="text-muted">Region Database</span>
+              <span class="fw-700">ap-southeast-1 (Singapore)</span>
+            </div>
+            <div class="flex justify-between py-8" style="border-bottom: 1px solid var(--border-color)">
+              <span class="text-muted">Kapasitas Maksimal Tenant</span>
+              <span class="fw-700">Unlimited (Postgres RLS Logical Isolation)</span>
+            </div>
+            <div class="flex justify-between py-8">
+              <span class="text-muted">Total Tabel Skema</span>
+              <span class="fw-700">12 Tabel (Profiles, Workspaces, Products, etc.)</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
   }
 
   if (page === 'pricing') {
