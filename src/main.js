@@ -1,4 +1,4 @@
-// ========== POSAS Main App ==========
+// ========== KasirPro Main App ==========
 import './style.css';
 import Chart from 'chart.js/auto';
 import * as htmlToImage from 'html-to-image';
@@ -26,7 +26,7 @@ function showUpgradeModal(reason) {
       <div class="card p-16 mb-24" style="background:#f8fafc">
         <div class="fw-700 mb-8">Pindai QRIS untuk Bayar</div>
         <!-- Simulasi QR Code -->
-        <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=POSAS_UPGRADE_PRO" alt="QRIS" style="width:200px; height:200px; margin:0 auto; border-radius:12px; border:2px solid var(--border)">
+        <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=KASIRPRO_UPGRADE_PRO" alt="QRIS" style="width:200px; height:200px; margin:0 auto; border-radius:12px; border:2px solid var(--border)">
         <div class="text-xs text-muted mt-8">Invoice: INV-${Date.now()}</div>
       </div>
 
@@ -173,7 +173,7 @@ const pages = {
   logs:       { title: 'Aktivitas', render: renderLogs, pro: true },
   settings:   { title: 'Pengaturan', render: renderSettings },
   team:       { title: 'Manajemen Tim', render: renderTeam },
-  pricing:    { title: 'POSAS Pro', render: renderPricing },
+  pricing:    { title: 'KasirPro Pro', render: renderPricing },
   appearance: { title: 'Tampilan', render: renderAppearance, pro: true },
   storeProfile: { title: 'Profil Toko', render: renderStoreProfile },
   receiptSettings: { title: 'Struk & Nota', render: renderReceiptSettings },
@@ -236,7 +236,7 @@ function applyBranding() {
   const user = getCurrentUser();
   const drawerAdmin = $('drawer-admin-portal');
   if (drawerAdmin) {
-    const isPlatformAdmin = user && (user.role === 'superadmin' || user.email === 'admin@posas.com' || user.email === 'admin@posas.id');
+    const isPlatformAdmin = user && (user.role === 'superadmin' || user.email === 'admin@posas.com' || user.email === 'admin@posas.id' || user.email === 'admin@kasirpro.com' || user.email === 'admin@kasirpro.id');
     drawerAdmin.classList.toggle('hidden', !isPlatformAdmin);
   }
 }
@@ -542,7 +542,7 @@ function handleCheckout() {
 }
 
 async function handleQRISPayment(amount) {
-  const externalId = 'posas-' + Date.now();
+  const externalId = 'kasirpro-' + Date.now();
   showModal(`
     <div class="text-center p-20">
       <span class="material-icons-round spin mb-16" style="font-size:48px;color:var(--accent)">sync</span>
@@ -554,7 +554,7 @@ async function handleQRISPayment(amount) {
   const invoice = await createPaymentInvoice({
     external_id: externalId,
     amount: amount,
-    description: `Pembayaran di POSAS Store (${externalId})`
+    description: `Pembayaran di Toko KasirPro (${externalId})`
   });
 
   showModal(`
@@ -933,7 +933,7 @@ function bindPageEvents(page) {
           <div class="card p-16 text-sm">
             <div class="flex justify-between py-8" style="border-bottom: 1px solid var(--border-color)">
               <span class="text-muted">Versi Platform</span>
-              <span class="fw-700">POSAS v1.0.0 (SaaS Mode)</span>
+              <span class="fw-700">KasirPro v1.0.0 (SaaS Mode)</span>
             </div>
             <div class="flex justify-between py-8" style="border-bottom: 1px solid var(--border-color)">
               <span class="text-muted">Region Database</span>
