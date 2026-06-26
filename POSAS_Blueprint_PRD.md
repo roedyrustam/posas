@@ -473,8 +473,8 @@ erDiagram
 > Fitur yang **meningkatkan retensi**
 
 - [x] Booking & jadwal (kalender sederhana)
-- [ ] Notifikasi real (push notification)
-- [ ] Customer loyalty program
+- [x] Notifikasi real (push notification)
+- [x] Customer loyalty program
 - [x] Multi-payment gateway (QRIS & E-Wallet)
 - [x] PWA + Service Worker (offline-first)
 - [x] Export data (CSV/Excel)

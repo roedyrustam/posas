@@ -256,6 +256,9 @@ function navigateTo(page) {
 
   // Bind page-specific events
   bindPageEvents(page);
+
+  // Refresh notifications badge/dropdown on page change
+  renderNotificationDropdown();
 }
 
 // ===== Drawer =====
@@ -295,10 +298,40 @@ function closeModal() {
 }
 
 // ===== Notifications =====
+const shownNotifications = new Set(JSON.parse(sessionStorage.getItem('shown_notifications') || '[]'));
+
+function requestNotificationPermission() {
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission().then(permission => {
+      console.log('Browser notification permission:', permission);
+    });
+  }
+}
+
+function triggerBrowserNotification(n) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  if (shownNotifications.has(n.id)) return;
+
+  shownNotifications.add(n.id);
+  sessionStorage.setItem('shown_notifications', JSON.stringify([...shownNotifications]));
+
+  try {
+    new Notification(n.title, {
+      body: n.message,
+      icon: '/favicon.ico'
+    });
+  } catch (err) {
+    console.error('Failed to trigger browser notification:', err);
+  }
+}
+
 function renderNotificationDropdown() {
   const notifs = getNotifications();
   const list = $('notification-list');
   const badge = $('notification-badge');
+
+  // Trigger real browser push notifications for unseen ones
+  notifs.forEach(n => triggerBrowserNotification(n));
   
   if (notifs.length > 0) {
     badge.style.display = 'block';
@@ -368,7 +401,13 @@ function initNotifications() {
     });
   }
 
+  requestNotificationPermission();
   renderNotificationDropdown();
+
+  // Periodically check for notifications (low stock, bookings, etc.) every 15 seconds
+  setInterval(() => {
+    renderNotificationDropdown();
+  }, 15000);
 }
 
 // ===== POS Cart Logic =====
@@ -552,6 +591,7 @@ async function completeTransaction(paymentMethod, overriddenTotal) {
   closeModal();
   showReceiptModal(txn);
   addLog('Transaksi Baru', `Penjualan senilai ${formatRupiah(total)} kepada ${txn.customer}`);
+  renderNotificationDropdown(); // Instant update for low stock notifications
 }
 
 // ===== Page-specific event binding =====
