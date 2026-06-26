@@ -479,14 +479,52 @@ function handleCheckout() {
 
   showModal(`
     <div class="modal-title">Ringkasan Pembayaran</div>
-    ${items}
-    <div class="flex justify-between items-center mt-16" style="padding-top:12px">
-      <span class="fw-700" style="font-size:16px">Total</span>
-      <span class="fw-700" style="font-size:20px;color:var(--accent-light)" id="checkout-total-val">${formatRupiah(cart.total)}</span>
+    <div style="max-height: 180px; overflow-y: auto; margin-bottom: 12px;">
+      ${items}
+    </div>
+    
+    <!-- Diskon & Pajak (SaaS POS Standard) -->
+    <div class="card p-12 mt-12" style="background:var(--bg-elevated); border-radius:12px">
+      <div class="fw-700 text-xs mb-8" style="color:var(--text-secondary)">Diskon & Pajak</div>
+      <div class="grid-2 gap-8">
+        <div class="input-group mb-0">
+          <label class="input-label" style="font-size:10px">Diskon (%)</label>
+          <input class="input input-sm" id="checkout-discount" type="number" min="0" max="100" placeholder="0" value="0" style="padding:6px 8px; font-size:12px" />
+        </div>
+        <div class="input-group mb-0">
+          <label class="input-label" style="font-size:10px">Pajak PPN (%)</label>
+          <input class="input input-sm" id="checkout-tax" type="number" min="0" max="100" placeholder="11" value="11" style="padding:6px 8px; font-size:12px" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Rincian Biaya -->
+    <div class="mt-12 text-xs text-muted" style="border-bottom: 1px solid var(--border); padding-bottom: 8px">
+      <div class="flex justify-between py-2">
+        <span>Subtotal</span>
+        <span id="checkout-subtotal-lbl">${formatRupiah(cart.total)}</span>
+      </div>
+      <div class="flex justify-between py-2 text-danger hidden" id="row-checkout-discount">
+        <span>Diskon</span>
+        <span id="checkout-discount-lbl">-Rp 0</span>
+      </div>
+      <div class="flex justify-between py-2 text-danger hidden" id="row-checkout-loyalty">
+        <span>Tukar Poin</span>
+        <span id="checkout-loyalty-lbl">-Rp 0</span>
+      </div>
+      <div class="flex justify-between py-2" id="row-checkout-tax">
+        <span>Pajak (PPN 11%)</span>
+        <span id="checkout-tax-lbl">${formatRupiah(cart.total * 0.11)}</span>
+      </div>
+    </div>
+
+    <div class="flex justify-between items-center mt-12">
+      <span class="fw-700" style="font-size:16px">Total Akhir</span>
+      <span class="fw-700" style="font-size:20px;color:var(--accent-light)" id="checkout-total-val">${formatRupiah(cart.total * 1.11)}</span>
     </div>
 
     ${selectedPOSCustomer ? `
-    <div class="card p-12 mt-16" style="background:rgba(99,102,241,0.05); border-radius:12px">
+    <div class="card p-12 mt-12" style="background:rgba(99,102,241,0.05); border-radius:12px">
       <div class="flex justify-between items-center mb-8">
         <span class="text-xs text-muted">Loyalty Poin: <strong>${selectedPOSCustomer.points || 0}</strong></span>
         ${(selectedPOSCustomer.points || 0) >= 100 ? `
@@ -495,7 +533,8 @@ function handleCheckout() {
       </div>
       <div id="redemption-status" class="text-xs text-success hidden">✅ Diskon Rp 10.000 diterapkan</div>
     </div>` : ''}
-    <div class="mt-16" style="font-size:13px;color:var(--text-secondary);margin-bottom:8px">Metode Pembayaran</div>
+
+    <div class="mt-12" style="font-size:13px;color:var(--text-secondary);margin-bottom:8px">Metode Pembayaran</div>
     <div class="grid-2 gap-8 mb-16">
       <button class="btn btn-secondary pay-method active" data-method="qris">🔲 QRIS</button>
       <button class="btn btn-secondary pay-method" data-method="cash">💵 Tunai</button>
@@ -506,10 +545,56 @@ function handleCheckout() {
     </button>
   `);
 
-  // Payment method selection
   let selectedMethod = 'qris';
+  let loyaltyDiscount = 0;
+  let discountPercent = 0;
+  let taxPercent = 11;
+  let finalTotal = cart.total * 1.11;
+  let discountVal = 0;
+  let taxVal = cart.total * 0.11;
+
+  function recalculateCheckout() {
+    const subtotal = cart.total;
+    discountVal = subtotal * (discountPercent / 100);
+    const taxableAmount = Math.max(0, subtotal - discountVal - loyaltyDiscount);
+    taxVal = taxableAmount * (taxPercent / 100);
+    finalTotal = taxableAmount + taxVal;
+
+    document.getElementById('checkout-subtotal-lbl').textContent = formatRupiah(subtotal);
+
+    const discountRow = document.getElementById('row-checkout-discount');
+    if (discountVal > 0) {
+      discountRow.classList.remove('hidden');
+      document.getElementById('checkout-discount-lbl').textContent = '-' + formatRupiah(discountVal);
+    } else {
+      discountRow.classList.add('hidden');
+    }
+
+    const loyaltyRow = document.getElementById('row-checkout-loyalty');
+    if (loyaltyDiscount > 0) {
+      loyaltyRow.classList.remove('hidden');
+      document.getElementById('checkout-loyalty-lbl').textContent = '-' + formatRupiah(loyaltyDiscount);
+    } else {
+      loyaltyRow.classList.add('hidden');
+    }
+
+    const taxRow = document.getElementById('row-checkout-tax');
+    if (taxVal > 0 || taxPercent > 0) {
+      taxRow.classList.remove('hidden');
+      taxRow.firstElementChild.textContent = `Pajak (PPN ${taxPercent}%)`;
+      document.getElementById('checkout-tax-lbl').textContent = formatRupiah(taxVal);
+    } else {
+      taxRow.classList.add('hidden');
+    }
+
+    document.getElementById('checkout-total-val').textContent = formatRupiah(finalTotal);
+  }
+
   setTimeout(() => {
     document.querySelectorAll('.pay-method').forEach(btn => {
+      if (btn.dataset.method === 'qris') {
+        btn.classList.add('active', 'btn-primary');
+      }
       btn.addEventListener('click', () => {
         document.querySelectorAll('.pay-method').forEach(b => b.classList.remove('active', 'btn-primary'));
         btn.classList.add('active', 'btn-primary');
@@ -517,34 +602,52 @@ function handleCheckout() {
       });
     });
 
+    const discountInput = document.getElementById('checkout-discount');
+    if (discountInput) {
+      discountInput.addEventListener('input', (e) => {
+        discountPercent = Math.max(0, Math.min(100, Number(e.target.value) || 0));
+        recalculateCheckout();
+      });
+    }
+
+    const taxInput = document.getElementById('checkout-tax');
+    if (taxInput) {
+      taxInput.addEventListener('input', (e) => {
+        taxPercent = Math.max(0, Math.min(100, Number(e.target.value) || 0));
+        recalculateCheckout();
+      });
+    }
+
     const confirmBtn = document.getElementById('btn-confirm-pay');
     if (confirmBtn) confirmBtn.addEventListener('click', async () => {
+      const pm = selectedMethod === 'qris' ? 'QRIS' : 'Tunai';
+      const totalDiscount = discountVal + loyaltyDiscount;
       if (selectedMethod === 'qris') {
-        await handleQRISPayment(finalTotal);
+        await handleQRISPayment(finalTotal, totalDiscount, taxVal, cart.total);
       } else {
-        await completeTransaction('Cash', finalTotal);
+        await completeTransaction(pm, finalTotal, totalDiscount, taxVal, cart.total);
       }
     });
 
-    // Redemption logic
-    let finalTotal = cart.total;
     const redeemBtn = document.getElementById('btn-redeem-points');
     if (redeemBtn) redeemBtn.addEventListener('click', async () => {
       if (!canAccess('loyalty')) return showUpgradeModal('Loyalty Points');
       
       const res = await redeemPoints(selectedPOSCustomer.id, 100);
       if (res.success) {
-        finalTotal -= res.discount;
-        document.getElementById('checkout-total-val').textContent = formatRupiah(finalTotal);
+        loyaltyDiscount = res.discount;
         document.getElementById('redemption-status').classList.remove('hidden');
         redeemBtn.remove();
         showToast('Poin berhasil ditukarkan! 🎁');
+        recalculateCheckout();
       }
     });
-  }, 100);
+
+    recalculateCheckout();
+  }, 50);
 }
 
-async function handleQRISPayment(amount) {
+async function handleQRISPayment(amount, discount = 0, tax = 0, subtotal = 0) {
   const externalId = 'kasirpro-' + Date.now();
   showModal(`
     <div class="text-center p-20">
@@ -566,7 +669,7 @@ async function handleQRISPayment(amount) {
         <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(invoice.available_qr_codes[0].barcode_data)}" width="200" height="200" />
       </div>
       <h3 class="mb-4">${formatRupiah(amount)}</h3>
-      <p class="text-muted text-sm mb-20">Silakan scan QRIS di atas menggunakan aplikasi m-Banking atau E-Wallet Anda.</p>
+      <p class="text-muted text-sm mb-20">Silakan scan QRIS di atas menggunakan aplikasi m-Banking or E-Wallet Anda.</p>
       
       <div class="card p-12 mb-20 text-left" style="background:var(--bg-elevated);border-left:4px solid var(--warning)">
         <div class="text-xs text-muted">ID TRANSAKSI</div>
@@ -588,7 +691,7 @@ async function handleQRISPayment(amount) {
     const status = await checkPaymentStatus(invoice.id);
     if (status === 'PAID') {
       showToast('✅ Pembayaran Berhasil Diterima!');
-      await completeTransaction('QRIS');
+      await completeTransaction('QRIS', amount, discount, tax, subtotal);
     } else {
       showToast('❌ Pembayaran belum terdeteksi. Silakan coba lagi.', 'error');
       btn.disabled = false;
@@ -597,15 +700,18 @@ async function handleQRISPayment(amount) {
   });
 }
 
-async function completeTransaction(paymentMethod, overriddenTotal) {
+async function completeTransaction(paymentMethod, overriddenTotal, discount = 0, tax = 0, subtotal = 0) {
   const itemLabels = cart.items.map(i => i.qty > 1 ? `${i.name} x${i.qty}` : i.name);
-  const total = overriddenTotal || cart.total;
+  const total = overriddenTotal !== undefined ? overriddenTotal : cart.total;
   const txn = await addTransaction({
     items: itemLabels,
     total: total,
     customer: selectedPOSCustomer ? selectedPOSCustomer.name : 'Walk-in',
-    paymentMethod,
-    cartItems: [...cart.items]
+    method: paymentMethod,
+    cartItems: [...cart.items],
+    discount: discount,
+    tax: tax,
+    subtotal: subtotal
   });
 
   // Add points to customer (1 point per 1000)
