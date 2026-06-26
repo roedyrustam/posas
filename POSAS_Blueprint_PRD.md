@@ -89,6 +89,16 @@ graph TD
 | **Modals** | Bottom-sheet pattern (slide-up dari bawah) |
 | **Toasts** | Stack-based, auto-dismiss 3 detik |
 
+### 3.4 Arsitektur Multi-Tenancy & Standardisasi SaaS
+
+| Layer | Standar Implementasi | Keterangan |
+|-------|----------------------|------------|
+| **Isolasi Tenant** | Logical Isolation (Shared DB, RLS) | Menggunakan PostgreSQL Row Level Security (RLS) di Supabase. Setiap query secara otomatis difilter menggunakan `tenant_id` dari JWT session context. |
+| **Manajemen Sesi** | JWT + Custom Claims | JWT token berisi `tenant_id` dan `role` untuk meminimalkan query tambahan pada DB saat validasi hak akses. |
+| **SaaS Gateway** | API Versioning & Rate Limiter | API beroperasi pada `/api/v1/`. Rate limiting berbasis Token Bucket diterapkan menggunakan middleware Edge Functions berdasarkan tier langganan. |
+| **Webhooks** | Idempotent & Secure Webhook | Endpoint webhook pembayaran (Stripe, Midtrans) divalidasi dengan signature check dan tracking `event_id` untuk mencegah pemrosesan ganda. |
+| **Offline Sync** | Queue-based Sync + Conflict Resolution | Data transaksi POS disimpan di `localStorage` saat offline dan disinkronkan ke server menggunakan Service Worker dengan resolusi Last-Write-Wins (LWW). |
+
 ---
 
 ## 4. Struktur File
@@ -189,7 +199,7 @@ posas/
 | Laporan Pelanggan | Top customers + retensi |
 | Laporan Keuangan | Laba rugi + arus kas |
 
-### 5.9 ⚙️ Pengaturan (`renderSettings`)
+#### 5.9 ⚙️ Pengaturan (`renderSettings`)
 **Status**: ⚠️ Partial (UI only, tidak ada action)
 
 | Section | Item |
@@ -200,53 +210,127 @@ posas/
 | Upgrade | CTA "Upgrade ke Pro" |
 | Actions | Logout button, version info |
 
+### 5.10 👥 Manajemen Tim & Workspace (`renderTeam`)
+**Status**: ✅ Implemented (Functional UI + Backend)
+
+| Komponen | Detail |
+|----------|--------|
+| Workspace Switcher | Dropdown di navbar untuk berpindah antar tenant/outlet secara instan |
+| Workspace Settings | Ganti nama toko, upload logo toko, konfigurasi alamat & nomor telepon |
+| Member List | Daftar semua anggota tim beserta peran (Owner, Admin, Manager, Cashier) |
+| Invitation Modal | Undang anggota baru lewat email dengan opsi pemilihan role |
+| Token Validation | Undangan di-generate menggunakan cryptographically random token dengan kadaluarsa 7 hari |
+| Role Restriction | Hak akses halaman dan tombol dibatasi secara ketat berdasarkan matriks otorisasi |
+
+### 5.11 💳 Penagihan & Langganan / Billing (`renderBilling`)
+**Status**: ✅ Implemented (Functional UI + Gateway)
+
+| Komponen | Detail |
+|----------|--------|
+| Plan Display | Tampilan tier aktif saat ini (Free / Pro / Enterprise) beserta status siklus pembayaran |
+| Pricing Cards | Opsi upgrade ke paket Pro / Enterprise dengan pilihan billing bulanan/tahunan |
+| Gateway Checkout | Integrasi checkout aman menggunakan Stripe Checkout & Midtrans (lokal e-wallet/QRIS) |
+| Billing Portal | Redirect ke Stripe Customer Portal untuk manajemen metode bayar & download invoice histori |
+| Usage Metering | Visualisasi penggunaan limit (misal: "3/50 produk terpakai", "12/100 transaksi bulan ini") |
+
 ---
 
 ## 6. Data Model
 
-### 6.1 Entities (Mock — `data.js`)
+### 6.1 Entities & Relasi Database (SaaS Ready)
 
 ```mermaid
 erDiagram
-    TENANT ||--o{ PRODUCT : has
-    TENANT ||--o{ CUSTOMER : has
-    TENANT ||--o{ TRANSACTION : has
-    TRANSACTION }o--|| CUSTOMER : "sold to"
-    TRANSACTION }o--|{ PRODUCT : contains
+    WORKSPACES ||--o{ WORKSPACE_MEMBERS : has
+    WORKSPACES ||--o{ WORKSPACE_INVITATIONS : issues
+    WORKSPACES ||--o{ PRODUCTS : contains
+    WORKSPACES ||--o{ CUSTOMERS : tracks
+    WORKSPACES ||--o{ TRANSACTIONS : logs
+    WORKSPACES ||--o{ INVOICES : bills
+    WORKSPACES ||--o{ BOOKINGS : schedules
+    WORKSPACES ||--o| SUBSCRIPTIONS : billed_via
+    WORKSPACES ||--o{ USAGE_RECORDS : meters
+    
+    TRANSACTIONS }o--|| CUSTOMERS : "sold to"
+    TRANSACTIONS }o--|{ PRODUCTS : contains
 
-    TENANT {
-        string id PK
+    WORKSPACES {
+        uuid id PK
         string name
-        string owner
+        string slug
         string plan
-        date createdAt
+        uuid owner_id
+        timestamp created_at
     }
 
-    PRODUCT {
-        string id PK
+    WORKSPACE_MEMBERS {
+        uuid id PK
+        uuid workspace_id FK
+        uuid user_id FK
+        string role
+        timestamp joined_at
+    }
+
+    WORKSPACE_INVITATIONS {
+        uuid id PK
+        uuid workspace_id FK
+        string email
+        string role
+        string token
+        uuid invited_by FK
+        timestamp expires_at
+        timestamp accepted_at
+    }
+
+    PRODUCTS {
+        uuid id PK
+        uuid tenant_id FK
         string name
         number price
         number stock
         string category
         string emoji
+        timestamp created_at
     }
 
-    CUSTOMER {
-        string id PK
+    CUSTOMERS {
+        uuid id PK
+        uuid tenant_id FK
         string name
         string phone
-        number totalSpent
+        number total_spent
         number visits
-        date lastVisit
+        timestamp last_visit
     }
 
-    TRANSACTION {
-        string id PK
-        datetime date
-        string[] items
+    TRANSACTIONS {
+        uuid id PK
+        uuid tenant_id FK
+        timestamp date
+        jsonb items
         number total
-        string customer
-        string method
+        uuid customer_id FK
+        string payment_method
+    }
+
+    SUBSCRIPTIONS {
+        uuid id PK
+        uuid workspace_id FK
+        string stripe_customer_id
+        string stripe_subscription_id
+        string stripe_price_id
+        string status
+        timestamp current_period_end
+        timestamp updated_at
+    }
+
+    USAGE_RECORDS {
+        uuid id PK
+        uuid workspace_id FK
+        string metric
+        bigint quantity
+        timestamp period_start
+        timestamp period_end
     }
 ```
 
@@ -254,9 +338,9 @@ erDiagram
 
 | Object | Fields | Source |
 |--------|--------|-------|
-| `stats` | todayRevenue, todayOrders, totalProducts, totalCustomers, monthRevenue, lowStock | Computed dari entities |
-| `weeklyRevenue` | Array of `{ day, amount }` × 7 | Hardcoded mock |
-| `cart` | items[], total (getter), count (getter) | Runtime state |
+| `stats` | todayRevenue, todayOrders, totalProducts, totalCustomers, monthRevenue, lowStock | Computed dari database query / real-time cache |
+| `weeklyRevenue` | Array of `{ day, amount }` × 7 | Agregasi dinamis transaksi 7 hari terakhir |
+| `cart` | items[], total (getter), count (getter) | State lokal kasir (in-memory) |
 
 ### 6.3 Utility Functions
 
@@ -264,7 +348,7 @@ erDiagram
 |----------|-----------|---------|
 | `formatRupiah` | `(n: number) → string` | Format angka ke "Rp X.XXX" |
 | `getInitials` | `(name: string) → string` | "Andi Pratama" → "AP" |
-| `hashColor` | `(str: string) → string` | Deterministic color dari 8 palet |
+| `hashColor` | `(str: string) → string` | Deterministic color dari 8 palet untuk avatar |
 
 ---
 
@@ -363,14 +447,7 @@ erDiagram
 | ~~**CRUD Operations**~~ | ~~Add product/customer tidak persist~~ → ✅ Full CRUD | ~~🟠~~ ✅ Done |
 | ~~**Form Validation**~~ | ~~Tidak ada validasi input~~ → ✅ Required fields + error msg | ~~🟠~~ ✅ Done |
 | ~~**Reports**~~ | ~~Menu saja~~ → ✅ Analytics dashboard lengkap | ~~🟡~~ ✅ Done |
-| ~~**Booking**~~ | ~~Empty state~~ → ✅ CRUD + status management | ~~🟡~~ ✅ Done |
-| ~~**Invoice**~~ | ~~Empty state~~ → ✅ Create + status flow (Draft→Sent→Paid) | ~~🟡~~ ✅ Done |
-| ~~**Offline Support**~~ | ~~Tidak ada service worker~~ → ✅ PWA Active | ~~🟡~~ ✅ Done |
-| ~~**i18n**~~ | Hardcoded bahasa Indonesia | 🟢 Low |
-
----
-
-## 9. Roadmap Pengembangan
+| ~~**Booking**~~ | ~~Empty state~~ → ✅ CRUD + status managem## 9. Roadmap Pengembangan
 
 ### Phase 1 — Foundation (Minggu 1–2)
 > Membuat aplikasi **benar-benar fungsional**
@@ -378,7 +455,7 @@ erDiagram
 - [x] Integrasi backend (Supabase)
 - [x] Authentication (login, register)
 - [x] Multi-tenant isolation (RLS)
-- [x] CRUD persist: Products, Customers
+- [x] CRUD-persist: Products, Customers
 - [x] Form validation (semua modal input)
 - [x] Real cart persistence (localStorage + DB)
 
@@ -403,8 +480,8 @@ erDiagram
 - [x] Export data (CSV/Excel)
 - [x] Digital Receipt (PNG download & WhatsApp Share)
 
-### Phase 4 — Scale (Minggu 7+)
-> Fitur untuk **scaling bisnis**
+### Phase 4 — Scale & Hardening (Minggu 7+)
+> Fitur untuk **scaling bisnis dan standardisasi produksi**
 
 - [x] Multi-outlet support
 - [x] Team management (roles: Owner, Kasir, Manajer)
@@ -413,16 +490,27 @@ erDiagram
 - [x] Bulk product import (CSV)
 - [ ] API public untuk integrasi
 - [ ] White-label / custom branding
+- [x] Standardisasi Keamanan, Rate Limiting, Audit Logs, dan Kepatuhan Hukum
 
 ---
 
-## 10. Pricing Model (Rencana)
+## 10. Model Harga & Pembatasan Fitur (Feature Gating)
 
-| Paket | Harga | Fitur |
-|-------|-------|-------|
-| **Gratis** | Rp 0 | 1 outlet, 50 produk, POS, laporan dasar |
-| **Pro** | ~Rp 99.000/bln | Unlimited produk, invoice, booking, multi-payment |
-| **Enterprise** | Custom | Multi-outlet, team, API, white-label |
+Untuk mengamankan pendapatan berulang (SaaS) dan mencegah penyalahgunaan resource, pembatasan fitur (feature gating) dan limit penggunaan diterapkan secara ketat di sisi server (Supabase RLS & Edge Functions):
+
+| Fitur / Batasan | 🟢 Paket Gratis (Rp 0) | 🔵 Paket Pro (Rp 99.000/bln) | 👑 Paket Enterprise (Kustom) |
+|---|---|---|---|
+| **Jumlah Outlet** | Maksimal 1 Outlet | Maksimal 3 Outlet | Tanpa Batas (Unlimited) |
+| **Jumlah Produk** | Maksimal 50 Produk | Tanpa Batas (Unlimited) | Tanpa Batas (Unlimited) |
+| **Transaksi POS / Bulan**| Maksimal 100 Transaksi | Tanpa Batas (Unlimited) | Tanpa Batas (Unlimited) |
+| **Anggota Tim / Toko** | Maksimal 1 Pengguna (Owner) | Maksimal 10 Pengguna | Tanpa Batas (Unlimited) |
+| **Metode Pembayaran** | Tunai (Cash) | Tunai + QRIS Dinamis + E-Wallet | Semua Metode + Custom Integration |
+| **Invoicing & Booking** | Hanya View | Pembuatan & Siklus Status Penuh | Pembuatan & Siklus Status Penuh |
+| **WhatsApp Receipt** | Tidak Tersedia | Unlimited via WhatsApp Gateway | Unlimited + Custom Sender Number |
+| **Laporan & Analitik** | Laporan Dasar (Harian) | Dashboard Grafik Interaktif (Chart.js) | Advanced Business Intelligence & Export |
+| **API Access & Webhooks**| Tidak Tersedia | Tidak Tersedia | Akses API Publik + Custom Webhooks |
+| **Custom Branding** | Logo POSAS di Struk | Struk Tanpa Logo POSAS | White-Label Domain + Logo Sendiri |
+| **Uptime SLA** | N/A | 99.5% | 99.9% Dedicated Support |
 
 ---
 
@@ -440,6 +528,45 @@ erDiagram
 
 ---
 
+## 12. Standar Kepatuhan & Kehandalan SaaS (SaaS Standards)
+
+### 12.1 Keamanan Data & Isolasi Tenant
+- **PostgreSQL Row Level Security (RLS)**: Semua tabel data wajib dilindungi RLS. Kebijakan RLS memverifikasi `tenant_id` dari JWT klaim sesi untuk memastikan tidak terjadi kebocoran data antar-tenant (*cross-tenant data leakage*).
+- **Enkripsi**:
+  - **In-Transit**: Semua lalu lintas data wajib dilindungi enkripsi SSL/TLS 1.3.
+  - **At-Rest**: Data sensitif (credentials, token) dienkripsi menggunakan AES-256 di database.
+
+### 12.2 Kepatuhan Hukum (UU PDP & GDPR)
+- **UU Pelindungan Data Pribadi (UU PDP No. 27/2022)**:
+  - Menyediakan fitur penghapusan akun permanen (*right to be forgotten*) yang menghapus seluruh data tenant secara *cascade*.
+  - Pemisahan data pribadi pelanggan (nama, nomor telepon) dan opsi persetujuan pengumpulan data.
+  - Protokol pelaporan insiden kebocoran data otomatis ke administrator dalam waktu < 72 jam.
+
+### 12.3 API Rate Limiting & Proteksi DDoS
+- **Rate Limit per Tier**:
+  - **Gratis**: 60 request / menit per IP/User.
+  - **Pro**: 500 request / menit per IP/User.
+  - **Enterprise**: 2,000 request / menit (dapat ditingkatkan).
+- **Penanganan Batas**: Jika melebihi limit, API akan mengembalikan HTTP Status `429 Too Many Requests` disertai header `Retry-After`.
+
+### 12.4 Audit Logging (Jejak Audit)
+- Setiap aksi administratif penting (perubahan harga produk, penghapusan transaksi, transfer kepemilikan, perubahan konfigurasi integrasi pembayaran) dicatat dalam tabel `audit_logs`.
+- Logs bersifat *read-only* (tidak dapat diubah/dihapus oleh tenant) untuk kebutuhan kepatuhan hukum dan audit internal perusahaan.
+
+### 12.5 Rencana Pemulihan Bencana (Disaster Recovery & Backup)
+- **Backup**: Backup harian otomatis menggunakan *Point-in-Time Recovery* (PITR) dari Supabase dengan retensi minimum 30 hari.
+- **RTO (Recovery Time Objective)**: Target pemulihan sistem jika terjadi kegagalan total adalah < 2 jam.
+- **RPO (Recovery Point Objective)**: Kehilangan data maksimal yang ditoleransi adalah 5 menit terakhir sebelum kegagalan.
+
+### 12.6 Mekanisme Sinkronisasi Offline & Resolusi Konflik
+- **Lokal Caching**: Menggunakan PWA Service Worker + Workbox untuk menyimpan aset UI dan data produk di `indexedDB`.
+- **Queue Penjualan**: Penjualan baru saat offline masuk ke antrean (*offline queue*) di `localStorage`.
+- **Resolusi Konflik**: Saat koneksi kembali:
+  - Transaksi penjualan disinkronkan secara sekuensial (First-In, First-Out).
+  - Perubahan stok produk menggunakan metode **Last-Write-Wins (LWW)** untuk modifikasi inventaris sederhana, sedangkan transaksi kasir tetap diakumulasikan berdasarkan riwayat waktu kejadian (*timestamp*) transaksi.
+
+---
+
 > **Dokumen ini adalah living document.** Update setiap kali ada perubahan arsitektur, fitur, atau prioritas.
 >
-> *Last updated: 2026-05-11 • v1.1.0*
+> *Last updated: 2026-06-26 • v1.2.0*

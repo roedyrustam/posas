@@ -3,13 +3,13 @@ import './style.css';
 import Chart from 'chart.js/auto';
 import * as htmlToImage from 'html-to-image';
 import { createPaymentInvoice, checkPaymentStatus } from './payment.js';
-import { products, customers, cart, formatRupiah, addProduct, addCustomer, addTransaction, decreaseStock, addInvoice, updateInvoiceStatus, addBooking, updateBookingStatus, deleteProduct, deleteCustomer, register, login, logout, getSession, getCurrentUser, exportToCSV, transactions, canAccess, fetchTeam, addStaff, removeStaff, redeemPoints, upgradeToPro, bulkAddProducts, branding, updateBranding, logs, addLog, getNotifications, dismissNotification, getCustomerTier, outlets, activeOutlet, setActiveOutlet, addOutlet, updateOutlet, deleteOutlet } from './data.js';
+import { products, customers, cart, formatRupiah, addProduct, addCustomer, addTransaction, decreaseStock, addInvoice, updateInvoiceStatus, addBooking, updateBookingStatus, deleteProduct, deleteCustomer, register, login, logout, getSession, getCurrentUser, exportToCSV, transactions, canAccess, fetchTeam, addStaff, removeStaff, redeemPoints, upgradeToPro, bulkAddProducts, branding, updateBranding, logs, addLog, getNotifications, dismissNotification, getCustomerTier, outlets, activeOutlet, setActiveOutlet, addOutlet, updateOutlet, deleteOutlet, toggleTenantPlan } from './data.js';
 import {
   renderDashboard, renderPOS, renderProducts,
   renderCustomers, renderFinance, renderBooking,
   renderInvoices, renderReports, renderSettings, renderTeam, renderPricing,
   renderAppearance, renderStoreProfile, renderReceiptSettings, renderLogs, renderInvoiceDetail,
-  renderManageOutlets
+  renderManageOutlets, renderAdminPortal
 } from './pages.js';
 import { getWeeklyRevenue } from './data.js';
 
@@ -143,7 +143,8 @@ const pages = {
   appearance: { title: 'Tampilan', render: renderAppearance, pro: true },
   storeProfile: { title: 'Profil Toko', render: renderStoreProfile },
   receiptSettings: { title: 'Struk & Nota', render: renderReceiptSettings },
-  manage_outlets: { title: 'Kelola Cabang', render: renderManageOutlets }
+  manage_outlets: { title: 'Kelola Cabang', render: renderManageOutlets },
+  admin_portal: { title: 'Portal Platform Admin', render: renderAdminPortal }
 };
 
 let currentPage = 'dashboard';
@@ -192,6 +193,14 @@ function applyBranding() {
   const drawerLogo = document.querySelector('.drawer-logo');
   if (drawerLogo && branding.storeEmoji) {
     drawerLogo.innerHTML = `<span style="font-size:24px">${branding.storeEmoji}</span>`;
+  }
+
+  // Show/Hide Super Admin drawer button dynamically
+  const user = getCurrentUser();
+  const drawerAdmin = $('drawer-admin-portal');
+  if (drawerAdmin) {
+    const isPlatformAdmin = user && (user.role === 'owner' || user.email === 'admin@posas.id');
+    drawerAdmin.classList.toggle('hidden', !isPlatformAdmin);
   }
 }
 
@@ -536,6 +545,28 @@ async function completeTransaction(paymentMethod, overriddenTotal) {
 // ===== Page-specific event binding =====
 function bindPageEvents(page) {
   
+  if (page === 'admin_portal') {
+    const btnBack = document.getElementById('btn-back-to-app');
+    if (btnBack) {
+      btnBack.addEventListener('click', () => {
+        navigateTo('dashboard');
+      });
+    }
+
+    document.querySelectorAll('.btn-toggle-tenant-plan').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.id;
+        const res = toggleTenantPlan(id);
+        if (res.success) {
+          showToast(`Paket tenant berhasil diubah ke ${res.plan.toUpperCase()}! 👑`);
+          navigateTo('admin_portal'); // Re-render to refresh statistics and buttons
+        } else {
+          showToast(res.error || 'Gagal mengubah paket tenant.', 'error');
+        }
+      });
+    });
+  }
+
   if (page === 'pricing') {
     const btnUpgrade = document.getElementById('btn-upgrade-pro');
     if (btnUpgrade) {

@@ -735,7 +735,7 @@ export function canAccess(action) {
   if (!user) return false;
   
   const permissions = {
-    'owner': ['dashboard', 'pos', 'products', 'customers', 'finance', 'reports', 'booking', 'invoices', 'settings', 'manage_staff', 'delete_data', 'appearance', 'storeProfile', 'receiptSettings', 'team', 'loyalty', 'logs', 'manage_outlets'],
+    'owner': ['dashboard', 'pos', 'products', 'customers', 'finance', 'reports', 'booking', 'invoices', 'settings', 'manage_staff', 'delete_data', 'appearance', 'storeProfile', 'receiptSettings', 'team', 'loyalty', 'logs', 'manage_outlets', 'admin_portal'],
     'kasir': ['dashboard', 'pos', 'customers', 'booking', 'settings', 'appearance', 'storeProfile', 'receiptSettings', 'manage_outlets'],
     'manajer': ['dashboard', 'pos', 'products', 'customers', 'booking', 'invoices', 'settings', 'reports', 'appearance', 'storeProfile', 'receiptSettings', 'loyalty', 'logs', 'manage_outlets']
   };
@@ -1035,4 +1035,111 @@ export function addLog(action, details) {
   if (logs.length > 100) logs.pop(); // Keep last 100 logs
   saveJSON(KEYS.logs, logs);
   return log;
+}
+
+// --- Platform Admin Cross-Tenant Simulation (SaaS Multi-Tenant) ---
+export function getAllTenantsData() {
+  const tenantsMap = new Map();
+  
+  // Scan localStorage keys to assemble tenant namespaces
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    const match = key.match(/^(tn_[a-zA-Z0-9_\-]+)_(.+)$/);
+    if (match) {
+      const tenantId = match[1];
+      const subKey = match[2];
+      
+      if (!tenantsMap.has(tenantId)) {
+        tenantsMap.set(tenantId, {
+          id: tenantId,
+          name: 'Toko Saya',
+          owner: 'Pemilik',
+          plan: 'free',
+          productsCount: 0,
+          transactionsCount: 0,
+          revenue: 0,
+          createdAt: '2026-05-25'
+        });
+      }
+      
+      const tenantInfo = tenantsMap.get(tenantId);
+      try {
+        const val = JSON.parse(localStorage.getItem(key));
+        if (subKey === KEYS.branding) {
+          tenantInfo.name = val.storeName || tenantInfo.name;
+        } else if (subKey === KEYS.session) {
+          tenantInfo.owner = val.name || tenantInfo.owner;
+          tenantInfo.plan = val.plan || tenantInfo.plan;
+          tenantInfo.createdAt = val.createdAt || tenantInfo.createdAt;
+        } else if (subKey === KEYS.products) {
+          tenantInfo.productsCount = Array.isArray(val) ? val.length : 0;
+        } else if (subKey === KEYS.transactions) {
+          if (Array.isArray(val)) {
+            tenantInfo.transactionsCount = val.length;
+            tenantInfo.revenue = val.reduce((sum, t) => sum + (t.total || 0), 0);
+          }
+        }
+      } catch (e) {
+        // ignore parsing errors
+      }
+    }
+  }
+  
+  // Always fallback/include current tenant if none found (e.g. fresh state)
+  const currentT = getCurrentTenant();
+  if (tenantsMap.size === 0 || !tenantsMap.has(currentT.id)) {
+    tenantsMap.set(currentT.id, {
+      id: currentT.id,
+      name: branding.storeName || currentT.name,
+      owner: currentT.owner,
+      plan: currentT.plan,
+      createdAt: currentT.createdAt,
+      productsCount: products.length,
+      transactionsCount: transactions.length,
+      revenue: transactions.reduce((sum, t) => sum + (t.total || 0), 0)
+    });
+  }
+  
+  return Array.from(tenantsMap.values());
+}
+
+export function toggleTenantPlan(tenantId) {
+  const sessionKey = `${tenantId}_${KEYS.session}`;
+  const brandingKey = `${tenantId}_${KEYS.branding}`;
+  
+  try {
+    const rawSession = localStorage.getItem(sessionKey);
+    if (rawSession) {
+      const session = JSON.parse(rawSession);
+      const newPlan = session.plan === 'pro' ? 'free' : 'pro';
+      session.plan = newPlan;
+      localStorage.setItem(sessionKey, JSON.stringify(session));
+      
+      // Also update in active session if it's the currently logged-in user
+      const activeSession = JSON.parse(localStorage.getItem(KEYS.session));
+      if (activeSession && activeSession.tenantId === tenantId) {
+        activeSession.plan = newPlan;
+        localStorage.setItem(KEYS.session, JSON.stringify(activeSession));
+      }
+      
+      // Update tenant-scoped branding plan representation too
+      const rawBranding = localStorage.getItem(brandingKey);
+      if (rawBranding) {
+        const b = JSON.parse(rawBranding);
+        b.plan = newPlan;
+        localStorage.setItem(brandingKey, JSON.stringify(b));
+      }
+      
+      // Re-initialize tenant data in memory to apply changes locally if current tenant was modified
+      const currentT = getCurrentTenant();
+      if (currentT.id === tenantId) {
+        initializeTenantData();
+      }
+      
+      return { success: true, plan: newPlan };
+    }
+  } catch (e) {
+    console.error(e);
+  }
+  return { success: false, error: 'Gagal memperbarui status paket tenant.' };
 }
