@@ -258,7 +258,8 @@ export async function syncCloudData() {
         customer: row.customer_name || 'Walk-in',
         items: Array.isArray(row.items) ? row.items : (typeof row.items === 'string' ? JSON.parse(row.items) : []),
         date: row.created_at ? new Date(row.created_at).toISOString().slice(0, 16).replace('T', ' ') : '',
-        outletId: row.outlet_id || 'o1'
+        outletId: row.outlet_id || 'o1',
+        cartItems: row.raw_items || []
       }))); 
       saveJSON(KEYS.transactions, transactions); 
     }
@@ -1042,11 +1043,12 @@ export function getTopProducts(limit = 5) {
   const counts = {};
   const filteredTxns = getFilteredTransactions();
   filteredTxns.forEach(t => {
-    if (t.cartItems) {
-      t.cartItems.forEach(item => {
-        counts[item.name] = (counts[item.name] || 0) + item.qty;
+    const itemsArray = t.cartItems || t.raw_items;
+    if (itemsArray && Array.isArray(itemsArray)) {
+      itemsArray.forEach(item => {
+        counts[item.name] = (counts[item.name] || 0) + (item.qty || 1);
       });
-    } else {
+    } else if (t.items && Array.isArray(t.items)) {
       // Fallback for old transactions
       t.items.forEach(label => {
         const name = label.split(' x')[0];
