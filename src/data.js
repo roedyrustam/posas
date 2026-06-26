@@ -755,6 +755,79 @@ export function resetAllData() {
 
 // ========== AUTH SYSTEM (Supabase) ==========
 
+export async function seedDefaultDataForTenant(userId, tenantId, email, storeName) {
+  // Generate products with unique UUIDs
+  const seededProducts = DEFAULT_PRODUCTS.map(p => ({
+    id: crypto.randomUUID(),
+    user_id: userId,
+    tenant_id: tenantId,
+    name: p.name,
+    price: Number(p.price),
+    stock: Number(p.stock),
+    category: p.category,
+    emoji: p.emoji || '📦',
+    sku: p.sku || '',
+    cost_price: Number(p.cost_price) || 0,
+    outletId: 'o1'
+  }));
+
+  // Generate customers with unique UUIDs
+  const seededCustomers = DEFAULT_CUSTOMERS.map(c => ({
+    id: crypto.randomUUID(),
+    user_id: userId,
+    tenant_id: tenantId,
+    name: c.name,
+    phone: c.phone || '',
+    email: c.email || '',
+    totalSpent: Number(c.totalSpent) || 0,
+    visits: Number(c.visits) || 0,
+    lastVisit: c.lastVisit || new Date().toISOString().slice(0, 10),
+    points: Number(c.points) || 0,
+    notes: c.notes || ''
+  }));
+
+  // Save to local storage for the new tenant namespace
+  saveJSON(KEYS.products, seededProducts);
+  saveJSON(KEYS.customers, seededCustomers);
+  saveJSON(KEYS.transactions, []);
+  saveJSON(KEYS.staff, [
+    { id: 's0', name: 'Admin Utama', email: email || 'admin@kasirpro.id', role: 'Owner', status: 'Active', password: 'password123' }
+  ]);
+  saveJSON(KEYS.outlets, DEFAULT_OUTLETS);
+  saveJSON(KEYS.activeOutlet, DEFAULT_OUTLETS[0].id);
+  saveJSON(KEYS.notifications, []);
+  saveJSON(KEYS.invoices, []);
+  saveJSON(KEYS.bookings, []);
+  saveJSON(KEYS.branding, {
+    accent: '#6366f1',
+    storeName: storeName || 'Toko Baru',
+    storeEmoji: '🏪',
+    receiptHeader: 'Terima kasih telah berbelanja!',
+    receiptFooter: 'Silakan berkunjung kembali.',
+    theme: 'dark'
+  });
+
+  // Load into memory arrays
+  products.length = 0;
+  products.push(...seededProducts);
+
+  customers.length = 0;
+  customers.push(...seededCustomers);
+
+  // Sync with cloud database Supabase
+  try {
+    const [{ error: pErr }, { error: cErr }] = await Promise.all([
+      supabase.from('products').insert(seededProducts),
+      supabase.from('customers').insert(seededCustomers)
+    ]);
+    if (pErr) throw pErr;
+    if (cErr) throw cErr;
+    console.log('Database seeded for tenant:', tenantId);
+  } catch (err) {
+    console.error('Failed to sync seeded data to Supabase:', err);
+  }
+}
+
 export async function register({ name, email, password, storeName }) {
   const { data, error } = await supabase.auth.signUp({
     email,
@@ -771,7 +844,22 @@ export async function register({ name, email, password, storeName }) {
   if (!data || !data.user) return { ok: false, error: 'Registration failed to return user data' };
   
   const user = data.user;
-  const tenantId = 'tn_' + user.id.slice(0, 8);
+  const legacyTenantId = 'tn_' + user.id.slice(0, 8);
+
+  // Wait for profile trigger to complete and fetch the real tenant_id (workspace UUID)
+  let finalTenantId = legacyTenantId;
+  for (let i = 0; i < 5; i++) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('tenant_id')
+      .eq('id', user.id)
+      .single();
+    if (profile && profile.tenant_id) {
+      finalTenantId = profile.tenant_id;
+      break;
+    }
+    await new Promise(r => setTimeout(r, 200));
+  }
 
   const session = { 
     userId: user.id, 
@@ -780,10 +868,14 @@ export async function register({ name, email, password, storeName }) {
     storeName: storeName, 
     role: 'owner', 
     plan: 'free',
-    tenantId: tenantId,
+    tenantId: finalTenantId,
     createdAt: new Date().toISOString().slice(0, 10)
   };
   saveJSON(KEYS.session, session);
+
+  // Seed default data for the new tenant
+  await seedDefaultDataForTenant(user.id, finalTenantId, user.email, storeName);
+
   initializeTenantData(); // Force re-initialization of memory data to load the new tenant namespace!
   return { ok: true, user: session };
 }
