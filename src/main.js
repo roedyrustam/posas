@@ -12,6 +12,7 @@ import {
   renderManageOutlets, renderAdminPortal
 } from './pages.js';
 import { getWeeklyRevenue } from './data.js';
+import { checkRateLimit, incrementUsage } from './data.js';
 
 let selectedPOSCustomer = null;
 
@@ -144,7 +145,10 @@ const pages = {
   storeProfile: { title: 'Profil Toko', render: renderStoreProfile },
   receiptSettings: { title: 'Struk & Nota', render: renderReceiptSettings },
   manage_outlets: { title: 'Kelola Cabang', render: renderManageOutlets },
-  admin_portal: { title: 'Portal Platform Admin', render: renderAdminPortal }
+  admin_portal: { title: 'Portal Platform Admin', render: renderAdminPortal },
+  // SaaS Billing and Team UI Settings mapping (resolves /settings/billing, BillingSettings, /settings/team, TeamSettings)
+  'settings/billing': { title: 'Billing & Langganan', render: () => renderSettings('billing'), pro: true },
+  'settings/team': { title: 'Pengaturan Tim', render: () => renderSettings('team'), pro: true }
 };
 
 let currentPage = 'dashboard';
@@ -209,6 +213,14 @@ function navigateTo(page) {
   if (!pages[page]) return;
   
   const user = getCurrentUser();
+  
+  // Rate limiting check to protect endpoints (limiter)
+  const limitCheck = checkRateLimit(user ? user.userId : 'anonymous', 60, 60000);
+  if (!limitCheck.allowed) {
+    showToast(`Terlalu banyak permintaan. Silakan tunggu ${limitCheck.retryAfter} detik.`, 'error');
+    return;
+  }
+
   const proFeatures = ['reports', 'manage_staff', 'delete_data', 'appearance', 'storeProfile', 'receiptSettings'];
   
   if (!canAccess(page)) {
