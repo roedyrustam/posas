@@ -61,70 +61,103 @@ function showUpgradeModal(reason) {
 function showCustomerDetailModal(customer) {
   const user = getCurrentUser() || { plan: 'free' };
   const isPro = user.plan === 'pro';
-  const initials = customer.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   const tier = getCustomerTier(customer.points || 0);
 
   showModal(`
     <div class="p-4">
-      <div class="flex items-center gap-16 mb-24">
-        <div class="avatar-btn" style="width:64px;height:64px;font-size:24px;background:${hashColor(customer.name)}">
-          <span class="avatar-text" style="color:white">${initials}</span>
-        </div>
-        <div>
-          <h2 class="fw-700" style="font-size:20px">${customer.name}</h2>
-          <p class="text-muted text-sm">${customer.phone}</p>
-          <span class="badge ${tier.badge} mt-4"><span class="material-icons-round" style="font-size:12px;margin-right:2px">${tier.icon}</span>${tier.name}</span>
-        </div>
+      <div class="modal-title mb-16">Detail & Edit Pelanggan</div>
+      
+      <div class="input-group">
+        <label class="input-label">Nama Pelanggan *</label>
+        <input class="input" id="inp-cust-name" value="${customer.name}" />
+      </div>
+      
+      <div class="input-group">
+        <label class="input-label">Nomor Telepon *</label>
+        <input class="input" id="inp-cust-phone" value="${customer.phone}" />
+      </div>
+      
+      <div class="input-group">
+        <label class="input-label">Email</label>
+        <input class="input" id="inp-cust-email" value="${customer.email || ''}" />
       </div>
 
-      <div class="grid-2 mb-24">
-        <div class="card p-12 text-center">
-          <div class="text-muted text-xs uppercase mb-4">Total Belanja</div>
-          <div class="fw-700">${formatRupiah(customer.totalSpent)}</div>
-        </div>
-        <div class="card p-12 text-center">
-          <div class="text-muted text-xs uppercase mb-4">Poin Loyalitas</div>
-          <div class="fw-700 flex items-center justify-center gap-4" style="color:${tier.color}">
-            <span class="material-icons-round" style="font-size:18px">${tier.icon}</span>
-            ${customer.points || 0}
-          </div>
-        </div>
-      </div>
-
-      <div class="section mb-24">
+      <div class="section mb-16">
         <div class="section-header">
           <span class="section-title">Catatan Pelanggan</span>
           ${isPro ? '' : '<span class="badge badge-warning">PRO</span>'}
         </div>
         <div class="input-group">
-          <textarea class="input" id="inp-cust-notes" rows="3" placeholder="Tambahkan catatan tentang preferensi pelanggan..." ${isPro ? '' : 'disabled'}>${customer.notes || ''}</textarea>
-          ${!isPro ? '<p class="text-xs text-muted mt-8">Upgrade ke Pro untuk menyimpan catatan pelanggan.</p>' : ''}
+          <textarea class="input" id="inp-cust-notes" rows="2" placeholder="Preferensi pelanggan..." ${isPro ? '' : 'disabled'}>${customer.notes || ''}</textarea>
         </div>
       </div>
 
-      ${isPro ? `
-      <button class="btn btn-primary btn-block" id="btn-update-notes">
-        Simpan Catatan
-      </button>` : `
-      <button class="btn btn-primary btn-block" onclick="closeModal(); navigateTo('pricing')">
-        Upgrade Sekarang
-      </button>`}
+      <div class="grid-2 mb-16">
+        <div class="card p-8 text-center">
+          <div class="text-muted text-xs uppercase mb-4">Total Belanja</div>
+          <div class="fw-700">${formatRupiah(customer.totalSpent)}</div>
+        </div>
+        <div class="card p-8 text-center">
+          <div class="text-muted text-xs uppercase mb-4">Poin Loyalitas</div>
+          <div class="fw-700 flex items-center justify-center gap-4" style="color:${tier.color}">
+            <span class="material-icons-round" style="font-size:16px">${tier.icon}</span>
+            ${customer.points || 0}
+          </div>
+        </div>
+      </div>
+      
+      <div id="cust-form-error" style="color:var(--danger);font-size:12px;margin-bottom:8px;display:none"></div>
+      
+      <button class="btn btn-primary btn-block mb-8" id="btn-save-customer">
+        Simpan Perubahan
+      </button>
+      
+      <button class="btn btn-danger btn-block" id="btn-delete-customer" style="background:var(--danger); border-color:var(--danger)">
+        Hapus Pelanggan
+      </button>
     </div>
   `);
 
-  if (isPro) {
-    setTimeout(() => {
-      document.getElementById('btn-update-notes').addEventListener('click', async () => {
+  setTimeout(() => {
+    const saveBtn = document.getElementById('btn-save-customer');
+    if (saveBtn) {
+      saveBtn.addEventListener('click', async () => {
+        const name = document.getElementById('inp-cust-name').value.trim();
+        const phone = document.getElementById('inp-cust-phone').value.trim();
+        const email = document.getElementById('inp-cust-email').value.trim();
         const notes = document.getElementById('inp-cust-notes').value.trim();
-        customer.notes = notes;
-        // In a real app, we'd call an updateCustomer function
-        saveJSON(KEYS.customers, customers); 
-        showToast('Catatan pelanggan berhasil disimpan ✅');
+        const errEl = document.getElementById('cust-form-error');
+
+        if (!name || !phone) {
+          errEl.textContent = 'Nama dan Nomor Telepon wajib diisi.';
+          errEl.style.display = 'block';
+          return;
+        }
+
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<span class="material-icons-round spin">sync</span> Menyimpan...';
+
+        await updateCustomer(customer.id, { name, phone, email, notes: isPro ? notes : customer.notes });
+        showToast('Data pelanggan berhasil diperbarui ✅');
         closeModal();
         navigateTo('customers');
       });
-    }, 50);
-  }
+    }
+
+    const delBtn = document.getElementById('btn-delete-customer');
+    if (delBtn) {
+      delBtn.addEventListener('click', async () => {
+        if (confirm(`Apakah Anda yakin ingin menghapus pelanggan "${customer.name}"?`)) {
+          delBtn.disabled = true;
+          delBtn.innerHTML = '<span class="material-icons-round spin">sync</span> Menghapus...';
+          await deleteCustomer(customer.id);
+          showToast('Pelanggan berhasil dihapus 🗑️');
+          closeModal();
+          navigateTo('customers');
+        }
+      });
+    }
+  }, 50);
 }
 
 // Page registry
@@ -592,6 +625,90 @@ async function completeTransaction(paymentMethod, overriddenTotal) {
   showReceiptModal(txn);
   addLog('Transaksi Baru', `Penjualan senilai ${formatRupiah(total)} kepada ${txn.customer}`);
   renderNotificationDropdown(); // Instant update for low stock notifications
+}
+
+function showProductModal(product = null) {
+  const isEdit = !!product;
+  showModal(`
+    <div class="modal-title">${isEdit ? 'Edit Produk' : 'Tambah Produk Baru'}</div>
+    <div class="input-group">
+      <label class="input-label">Nama Produk *</label>
+      <input class="input" id="inp-p-name" placeholder="Contoh: Kopi Susu Gula Aren" value="${isEdit ? product.name : ''}" />
+    </div>
+    <div class="input-group">
+      <label class="input-label">Harga (Rp) *</label>
+      <input class="input" id="inp-p-price" type="number" placeholder="Contoh: 15000" value="${isEdit ? product.price : ''}" />
+    </div>
+    <div class="input-group">
+      <label class="input-label">Stok ${isEdit ? 'Saat Ini' : 'Awal'} *</label>
+      <input class="input" id="inp-p-stock" type="number" placeholder="Contoh: 100" value="${isEdit ? product.stock : ''}" />
+    </div>
+    <div class="input-group">
+      <label class="input-label">Kategori</label>
+      <select class="input" id="inp-p-cat">
+        <option value="Umum" ${isEdit && product.category === 'Umum' ? 'selected' : ''}>Umum</option>
+        <option value="Makanan" ${isEdit && product.category === 'Makanan' ? 'selected' : ''}>Makanan</option>
+        <option value="Minuman" ${isEdit && product.category === 'Minuman' ? 'selected' : ''}>Minuman</option>
+        <option value="Snack" ${isEdit && product.category === 'Snack' ? 'selected' : ''}>Snack</option>
+      </select>
+    </div>
+    <div id="p-form-error" style="color:var(--danger);font-size:12px;margin-bottom:8px;display:none"></div>
+    <button class="btn btn-primary btn-block mt-8" id="btn-save-product">
+      <span class="material-icons-round" style="font-size:18px">save</span> ${isEdit ? 'Simpan Perubahan' : 'Simpan Produk'}
+    </button>
+    ${isEdit ? `
+    <button class="btn btn-danger btn-block mt-8" id="btn-delete-product" style="background:var(--danger); border-color:var(--danger)">
+      <span class="material-icons-round" style="font-size:18px">delete</span> Hapus Produk
+    </button>
+    ` : ''}
+  `);
+
+  setTimeout(() => {
+    const saveBtn = document.getElementById('btn-save-product');
+    if (saveBtn) saveBtn.addEventListener('click', async () => {
+      const name = document.getElementById('inp-p-name').value.trim();
+      const price = Number(document.getElementById('inp-p-price').value);
+      const stock = Number(document.getElementById('inp-p-stock').value);
+      const category = document.getElementById('inp-p-cat').value;
+      const errEl = document.getElementById('p-form-error');
+
+      if (!name || isNaN(price) || isNaN(stock)) {
+        errEl.textContent = 'Nama, Harga, dan Stok wajib diisi.';
+        errEl.style.display = 'block';
+        return;
+      }
+
+      saveBtn.disabled = true;
+      saveBtn.innerHTML = '<span class="material-icons-round spin">sync</span> Menyimpan...';
+
+      if (isEdit) {
+        await updateProduct(product.id, { name, price, stock, category });
+        addLog('Edit Produk', `Ubah produk: ${name} (Harga: ${price}, Stok: ${stock})`);
+        showToast(`✅ Produk ${name} berhasil diperbarui`);
+      } else {
+        await addProduct({ name, price, stock, category });
+        addLog('Tambah Produk', `Produk baru: ${name} (Stok: ${stock})`);
+        showToast(`✅ Produk ${name} berhasil ditambahkan`);
+      }
+      closeModal();
+      navigateTo('products');
+    });
+
+    if (isEdit) {
+      const delBtn = document.getElementById('btn-delete-product');
+      if (delBtn) delBtn.addEventListener('click', async () => {
+        if (confirm(`Apakah Anda yakin ingin menghapus produk "${product.name}"?`)) {
+          delBtn.disabled = true;
+          delBtn.innerHTML = '<span class="material-icons-round spin">sync</span> Menghapus...';
+          await deleteProduct(product.id);
+          addLog('Hapus Produk', `Produk dihapus: ${product.name}`);
+          showToast(`🗑️ Produk ${product.name} berhasil dihapus`);
+          closeModal();
+          navigateTo('products');
+        }
+      });
+    }
+  }, 50);
 }
 
 // ===== Page-specific event binding =====
@@ -1411,6 +1528,18 @@ function bindPageEvents(page) {
         navigateTo('booking');
       });
     });
+
+    document.querySelectorAll('.btn-delete-booking').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        if (confirm('Apakah Anda yakin ingin menghapus booking ini?')) {
+          btn.disabled = true;
+          await deleteBooking(btn.dataset.id);
+          showToast('Booking berhasil dihapus 🗑️');
+          navigateTo('booking');
+        }
+      });
+    });
   }
 
   // === Product events ===
@@ -1477,61 +1606,21 @@ function bindPageEvents(page) {
     }
 
     const addBtn = document.getElementById('btn-add-product');
-    if (addBtn) addBtn.addEventListener('click', () => {
-      showModal(`
-        <div class="modal-title">Tambah Produk Baru</div>
-        <div class="input-group">
-          <label class="input-label">Nama Produk *</label>
-          <input class="input" id="inp-p-name" placeholder="Contoh: Kopi Susu Gula Aren" />
-        </div>
-        <div class="input-group">
-          <label class="input-label">Harga (Rp) *</label>
-          <input class="input" id="inp-p-price" type="number" placeholder="Contoh: 15000" />
-        </div>
-        <div class="input-group">
-          <label class="input-label">Stok Awal *</label>
-          <input class="input" id="inp-p-stock" type="number" placeholder="Contoh: 100" />
-        </div>
-        <div class="input-group">
-          <label class="input-label">Kategori</label>
-          <select class="input" id="inp-p-cat">
-            <option value="Umum">Umum</option>
-            <option value="Makanan">Makanan</option>
-            <option value="Minuman">Minuman</option>
-            <option value="Snack">Snack</option>
-          </select>
-        </div>
-        <div id="p-form-error" style="color:var(--danger);font-size:12px;margin-bottom:8px;display:none"></div>
-        <button class="btn btn-primary btn-block mt-8" id="btn-save-product">
-          <span class="material-icons-round" style="font-size:18px">save</span> Simpan Produk
-        </button>
-      `);
-      
-      setTimeout(() => {
-        const saveBtn = document.getElementById('btn-save-product');
-        if (saveBtn) saveBtn.addEventListener('click', async () => {
-          const name = document.getElementById('inp-p-name').value.trim();
-          const price = document.getElementById('inp-p-price').value;
-          const stock = document.getElementById('inp-p-stock').value;
-          const category = document.getElementById('inp-p-cat').value;
-          const errEl = document.getElementById('p-form-error');
+    if (addBtn) {
+      addBtn.addEventListener('click', () => {
+        showProductModal();
+      });
+    }
 
-          if (!name || !price || !stock) {
-            errEl.textContent = 'Nama, Harga, dan Stok wajib diisi.';
-            errEl.style.display = 'block';
-            return;
-          }
-
-          saveBtn.disabled = true;
-          saveBtn.innerHTML = '<span class="material-icons-round spin">sync</span> Menyimpan...';
-
-          await addProduct({ name, price, stock, category });
-          addLog('Tambah Produk', `Produk baru: ${name} (Stok: ${stock})`);
-          closeModal();
-          showToast(`✅ Produk ${name} berhasil ditambahkan`);
-          navigateTo('products');
-        });
-      }, 50);
+    // Edit/delete product via card click
+    document.querySelectorAll('.product-item').forEach(el => {
+      el.addEventListener('click', () => {
+        const id = el.dataset.id;
+        const product = products.find(p => p.id === id);
+        if (product) {
+          showProductModal(product);
+        }
+      });
     });
   }
 
@@ -2206,9 +2295,29 @@ async function showInvoiceModal(invId) {
         <span class="material-icons-round" style="font-size:18px">chat</span> WhatsApp
       </button>
     </div>
+    <div class="p-16 pt-0">
+      <button class="btn btn-danger btn-block" id="btn-delete-invoice" style="background:var(--danger); border-color:var(--danger)">
+        <span class="material-icons-round" style="font-size:18px">delete</span> Hapus Invoice
+      </button>
+    </div>
   `);
 
   setTimeout(() => {
+    const delBtn = document.getElementById('btn-delete-invoice');
+    if (delBtn) {
+      delBtn.addEventListener('click', async () => {
+        if (confirm(`Apakah Anda yakin ingin menghapus invoice "${inv.number}"?`)) {
+          delBtn.disabled = true;
+          delBtn.innerHTML = '<span class="material-icons-round spin">sync</span> Menghapus...';
+          await deleteInvoice(inv.id);
+          addLog('Hapus Invoice', `Invoice dihapus: ${inv.number}`);
+          showToast(`🗑️ Invoice ${inv.number} berhasil dihapus`);
+          closeModal();
+          navigateTo('invoices');
+        }
+      });
+    }
+
     document.getElementById('btn-download-invoice').addEventListener('click', async () => {
       const btn = document.getElementById('btn-download-invoice');
       const originalText = btn.innerHTML;
