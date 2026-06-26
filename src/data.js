@@ -781,8 +781,13 @@ export function canAccess(action) {
   const user = getCurrentUser();
   if (!user) return false;
   
+  // Platform Super Admin restriction
+  if (action === 'admin_portal') {
+    return user.email === 'admin@posas.id' || user.role.toLowerCase() === 'superadmin';
+  }
+  
   const permissions = {
-    'owner': ['dashboard', 'pos', 'products', 'customers', 'finance', 'reports', 'booking', 'invoices', 'settings', 'manage_staff', 'delete_data', 'appearance', 'storeProfile', 'receiptSettings', 'team', 'loyalty', 'logs', 'manage_outlets', 'admin_portal'],
+    'owner': ['dashboard', 'pos', 'products', 'customers', 'finance', 'reports', 'booking', 'invoices', 'settings', 'manage_staff', 'delete_data', 'appearance', 'storeProfile', 'receiptSettings', 'team', 'loyalty', 'logs', 'manage_outlets'],
     'kasir': ['dashboard', 'pos', 'customers', 'booking', 'settings', 'appearance', 'storeProfile', 'receiptSettings', 'manage_outlets'],
     'manajer': ['dashboard', 'pos', 'products', 'customers', 'booking', 'invoices', 'settings', 'reports', 'appearance', 'storeProfile', 'receiptSettings', 'loyalty', 'logs', 'manage_outlets']
   };
