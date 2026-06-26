@@ -1711,7 +1711,10 @@ export async function syncOfflineTransactions() {
         customer_name: txn.customer_name,
         method: txn.method,
         outlet_id: txn.outlet_id,
-        created_at: txn.created_at
+        created_at: txn.created_at,
+        discount: txn.discount || 0,
+        tax: txn.tax || 0,
+        subtotal: txn.subtotal || txn.total
       });
       if (txError) throw txError;
 
