@@ -1,5 +1,11 @@
 import { supabase } from './supabase.js';
 
+export const PLAN_LIMITS = {
+  free: { outlets: 1, products: 50, transactions: 100, teamMembers: 1 },
+  pro: { outlets: 3, products: Infinity, transactions: Infinity, teamMembers: 10 },
+  enterprise: { outlets: Infinity, products: Infinity, transactions: Infinity, teamMembers: Infinity }
+};
+
 // --- Storage Helpers ---
 const KEYS = {
   products: 'posas_products',
@@ -251,7 +257,8 @@ export async function addProduct({ name, price, stock, category, emoji }) {
   if (!session) return { error: 'Unauthorized' };
 
   // Limit check
-  if (session.plan === 'free' && products.length >= 50) {
+  const limit = PLAN_LIMITS[session.plan]?.products || 50;
+  if (products.length >= limit) {
     return { error: 'LIMIT_REACHED' };
   }
 
@@ -273,7 +280,17 @@ export async function addProduct({ name, price, stock, category, emoji }) {
   products.unshift(product);
   saveJSON(KEYS.products, products);
 
-  await supabase.from('products').insert(product);
+  try {
+    await supabase.from('products').insert(product);
+    await createAuditLog({
+      action: 'CREATE',
+      targetTable: 'products',
+      recordId: product.id,
+      newData: product
+    });
+  } catch (err) {
+    console.error('Failed to sync product insert, keeping local-first', err);
+  }
   return product;
 }
 
@@ -370,12 +387,20 @@ export async function deleteCustomer(id) {
 
 // --- Transactions ---
 export async function addTransaction({ items, total, customer, method, cartItems }) {
+  const session = getSession();
   const user = (await supabase.auth.getUser()).data.user;
   if (!user) return null;
 
+  // Transaction limit check
+  const limit = PLAN_LIMITS[session.plan]?.transactions || 100;
+  const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+  const monthTxCount = transactions.filter(t => t.created_at && t.created_at.startsWith(currentMonth)).length;
+  if (monthTxCount >= limit) {
+    return { error: 'LIMIT_REACHED' };
+  }
+
   const now = new Date();
-  const pad = n => String(n).padStart(2, '0');
-  const dateStr = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  const dateStr = now.toISOString().slice(0, 16).replace('T', ' ');
 
   const txn = {
     id: crypto.randomUUID(),
@@ -394,19 +419,21 @@ export async function addTransaction({ items, total, customer, method, cartItems
   transactions.unshift(localTxn);
   saveJSON(KEYS.transactions, transactions);
 
-  // Sync to Cloud
-  await supabase.from('transactions').insert({
-    id: txn.id,
-    user_id: txn.user_id,
-    tenant_id: getSession().tenantId,
-    items: items,
-    total: txn.total,
-    customer_name: txn.customer_name,
-    method: txn.method,
-    outlet_id: activeOutlet || 'o1'
-  });
+  // Sync to Cloud with fallback queue
+  try {
+    const { error: txErr } = await supabase.from('transactions').insert({
+      id: txn.id,
+      user_id: txn.user_id,
+      tenant_id: getSession().tenantId,
+      items: items,
+      total: txn.total,
+      customer_name: txn.customer_name,
+      method: txn.method,
+      outlet_id: activeOutlet || 'o1'
+    });
+    if (txErr) throw txErr;
 
-  // Update customer stats
+    // Update customer stats
     const c = customers.find(cu => cu.name === txn.customer_name);
     if (c) {
       const updates = {
@@ -420,9 +447,26 @@ export async function addTransaction({ items, total, customer, method, cartItems
       await supabase.from('customers').update(updates).eq('id', c.id);
     }
 
-  // Decrease stock
-  if (cartItems) {
-    await decreaseStock(cartItems);
+    // Decrease stock
+    if (cartItems) {
+      await decreaseStock(cartItems);
+    }
+  } catch (err) {
+    console.warn('Supabase insert failed, queuing transaction offline 📥', err);
+    const queue = loadJSONDirect('posas_offline_transactions', []);
+    queue.push({
+      id: txn.id,
+      user_id: txn.user_id,
+      tenant_id: getSession().tenantId,
+      items: items,
+      total: txn.total,
+      customer_name: txn.customer_name,
+      method: txn.method,
+      outlet_id: activeOutlet || 'o1',
+      created_at: txn.created_at,
+      cartItems: cartItems
+    });
+    localStorage.setItem('posas_offline_transactions', JSON.stringify(queue));
   }
 
   return localTxn;
@@ -938,7 +982,12 @@ export function setActiveOutlet(id) {
 
 export async function addOutlet({ name, address, phone }) {
   const session = getSession();
-  if (!session || session.plan !== 'pro') return { error: 'PRO_ONLY' };
+  if (!session) return { error: 'Unauthorized' };
+
+  const limit = PLAN_LIMITS[session.plan]?.outlets || 1;
+  if (outlets.length >= limit) {
+    return { error: 'LIMIT_REACHED' };
+  }
 
   const newOutlet = {
     id: 'o' + Date.now(),
@@ -949,6 +998,14 @@ export async function addOutlet({ name, address, phone }) {
 
   outlets.push(newOutlet);
   saveJSON(KEYS.outlets, outlets);
+
+  await createAuditLog({
+    action: 'CREATE',
+    targetTable: 'outlets',
+    recordId: newOutlet.id,
+    newData: newOutlet
+  });
+
   return { success: true, outlet: newOutlet };
 }
 
@@ -966,7 +1023,7 @@ export async function updateOutlet(id, updates) {
 
 export async function deleteOutlet(id) {
   const session = getSession();
-  if (!session || session.plan !== 'pro') return { error: 'PRO_ONLY' };
+  if (!session) return { error: 'Unauthorized' };
 
   if (id === 'o1') return { error: 'CANNOT_DELETE_PRIMARY' };
   if (id === activeOutlet) return { error: 'CANNOT_DELETE_ACTIVE' };
@@ -974,8 +1031,17 @@ export async function deleteOutlet(id) {
   const idx = outlets.findIndex(o => o.id === id);
   if (idx === -1) return { error: 'NOT_FOUND' };
 
+  const oldData = outlets[idx];
   outlets.splice(idx, 1);
   saveJSON(KEYS.outlets, outlets);
+
+  await createAuditLog({
+    action: 'DELETE',
+    targetTable: 'outlets',
+    recordId: id,
+    oldData
+  });
+
   return { success: true };
 }
 
@@ -995,29 +1061,25 @@ export function generateSalesCSV() {
 
 // --- Staff Management ---
 export async function fetchTeam() {
-  // Simulate network delay
-  return new Promise(resolve => setTimeout(() => resolve(staff), 500));
+  const members = await fetchWorkspaceMembers();
+  return members;
 }
 
 export async function addStaff(data) {
-  const newStaff = {
-    id: 's' + Date.now(),
-    status: 'Active',
-    ...data
+  const res = await sendTeamInvitation({ email: data.email, role: data.role });
+  if (res.error) throw new Error(res.error);
+  return {
+    id: res.invite.id,
+    name: data.name || 'Undangan Staf',
+    email: data.email,
+    role: data.role,
+    status: 'Pending'
   };
-  staff.push(newStaff);
-  saveJSON(KEYS.staff, staff);
-  return newStaff;
 }
 
 export async function removeStaff(id) {
-  const idx = staff.findIndex(s => s.id === id);
-  if (idx > -1) {
-    staff.splice(idx, 1);
-    saveJSON(KEYS.staff, staff);
-    return true;
-  }
-  return false;
+  const res = await removeWorkspaceMember(id);
+  return res.success;
 }
 
 // --- Audit Logs ---
@@ -1143,3 +1205,384 @@ export function toggleTenantPlan(tenantId) {
   }
   return { success: false, error: 'Gagal memperbarui status paket tenant.' };
 }
+
+// ========== SAAS & WORKSPACE CORE FUNCTIONS ==========
+
+export async function fetchWorkspaces() {
+  const user = getSession();
+  if (!user) return [];
+  try {
+    const { data, error } = await supabase
+      .from('workspace_members')
+      .select(`
+        workspace_id,
+        role,
+        workspaces (
+          id,
+          name,
+          slug,
+          plan,
+          owner_id
+        )
+      `)
+      .eq('user_id', user.userId);
+    if (error) throw error;
+    return data.map(d => ({
+      id: d.workspaces.id,
+      name: d.workspaces.name,
+      slug: d.workspaces.slug,
+      plan: d.workspaces.plan,
+      ownerId: d.workspaces.owner_id,
+      role: d.role
+    }));
+  } catch (err) {
+    console.error('fetchWorkspaces error:', err);
+    return [{
+      id: user.tenantId,
+      name: user.storeName,
+      slug: 'toko-lokal',
+      plan: user.plan,
+      ownerId: user.userId,
+      role: user.role
+    }];
+  }
+}
+
+export async function createWorkspace({ name, slug }) {
+  const user = getSession();
+  if (!user) return { error: 'Unauthorized' };
+  try {
+    const { data: ws, error: wsErr } = await supabase
+      .from('workspaces')
+      .insert({ name, slug, owner_id: user.userId })
+      .select()
+      .single();
+    if (wsErr) throw wsErr;
+
+    const { error: memErr } = await supabase
+      .from('workspace_members')
+      .insert({ workspace_id: ws.id, user_id: user.userId, role: 'owner' });
+    if (memErr) throw memErr;
+
+    await createAuditLog({
+      action: 'CREATE',
+      targetTable: 'workspaces',
+      recordId: ws.id,
+      newData: ws
+    });
+
+    return { success: true, workspace: ws };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function switchWorkspace(workspaceId) {
+  const user = getSession();
+  if (!user) return { error: 'Unauthorized' };
+  try {
+    const { data: ws, error: wsErr } = await supabase
+      .from('workspaces')
+      .select('*')
+      .eq('id', workspaceId)
+      .single();
+    if (wsErr) throw wsErr;
+
+    const { data: member, error: memErr } = await supabase
+      .from('workspace_members')
+      .select('role')
+      .eq('workspace_id', workspaceId)
+      .eq('user_id', user.userId)
+      .single();
+    if (memErr) throw memErr;
+
+    user.tenantId = ws.id;
+    user.storeName = ws.name;
+    user.plan = ws.plan;
+    user.role = member.role;
+    saveJSON(KEYS.session, user);
+
+    initializeTenantData();
+    return { success: true, user };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function deleteWorkspaceAccount(workspaceId) {
+  const user = getSession();
+  if (!user) return { error: 'Unauthorized' };
+  try {
+    const { data: ws } = await supabase
+      .from('workspaces')
+      .select('owner_id')
+      .eq('id', workspaceId)
+      .single();
+    
+    if (!ws || ws.owner_id !== user.userId) {
+      return { error: 'Hanya pemilik yang dapat menghapus workspace.' };
+    }
+
+    await createAuditLog({
+      action: 'DELETE',
+      targetTable: 'workspaces',
+      recordId: workspaceId,
+      oldData: { id: workspaceId }
+    });
+
+    const { error } = await supabase
+      .from('workspaces')
+      .delete()
+      .eq('id', workspaceId);
+    if (error) throw error;
+
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function deleteUserAccount() {
+  const user = getSession();
+  if (!user) return { error: 'Unauthorized' };
+  try {
+    const { data: workspacesOwned } = await supabase
+      .from('workspaces')
+      .select('id')
+      .eq('owner_id', user.userId);
+
+    if (workspacesOwned) {
+      for (const ws of workspacesOwned) {
+        await deleteWorkspaceAccount(ws.id);
+      }
+    }
+
+    await supabase.from('profiles').delete().eq('id', user.userId);
+    await logout();
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function fetchWorkspaceMembers() {
+  const user = getSession();
+  if (!user) return [];
+  try {
+    const { data, error } = await supabase
+      .from('workspace_members')
+      .select(`
+        id,
+        role,
+        joined_at,
+        user_id,
+        profiles (
+          full_name,
+          email
+        )
+      `)
+      .eq('workspace_id', user.tenantId);
+    if (error) throw error;
+    return data.map(d => ({
+      id: d.id,
+      userId: d.user_id,
+      name: d.profiles?.full_name || 'Staf',
+      email: d.profiles?.email || '',
+      role: d.role,
+      status: 'Active',
+      joinedAt: d.joined_at
+    }));
+  } catch (err) {
+    console.error(err);
+    return staff;
+  }
+}
+
+export async function sendTeamInvitation({ email, role }) {
+  const user = getSession();
+  if (!user) return { error: 'Unauthorized' };
+  try {
+    const token = crypto.randomUUID();
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+
+    const { data: invite, error } = await supabase
+      .from('workspace_invitations')
+      .insert({
+        workspace_id: user.tenantId,
+        email,
+        role,
+        token,
+        invited_by: user.userId,
+        expires_at: expiresAt.toISOString()
+      })
+      .select()
+      .single();
+    
+    if (error) throw error;
+
+    await createAuditLog({
+      action: 'CREATE',
+      targetTable: 'workspace_invitations',
+      recordId: invite.id,
+      newData: invite
+    });
+
+    return { success: true, invite };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function acceptTeamInvitation(token) {
+  const user = getSession();
+  if (!user) return { error: 'Unauthorized' };
+  try {
+    const { data: invite, error: inviteErr } = await supabase
+      .from('workspace_invitations')
+      .select('*')
+      .eq('token', token)
+      .single();
+    if (inviteErr || !invite) throw new Error('Undangan tidak valid atau kadaluarsa.');
+
+    if (new Date(invite.expires_at) < new Date()) {
+      throw new Error('Undangan telah kadaluarsa.');
+    }
+
+    const { error: memErr } = await supabase
+      .from('workspace_members')
+      .insert({
+        workspace_id: invite.workspace_id,
+        user_id: user.userId,
+        role: invite.role
+      });
+    if (memErr) throw memErr;
+
+    await supabase.from('workspace_invitations').delete().eq('id', invite.id);
+
+    await createAuditLog({
+      action: 'UPDATE',
+      targetTable: 'workspace_members',
+      recordId: invite.workspace_id,
+      newData: { workspace_id: invite.workspace_id, user_id: user.userId, role: invite.role }
+    });
+
+    return { success: true, workspaceId: invite.workspace_id };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function removeWorkspaceMember(memberId) {
+  const user = getSession();
+  if (!user) return { error: 'Unauthorized' };
+  try {
+    const { data: member } = await supabase
+      .from('workspace_members')
+      .select('*')
+      .eq('id', memberId)
+      .single();
+    
+    if (!member) throw new Error('Anggota tidak ditemukan.');
+
+    if (member.user_id === user.userId) {
+      throw new Error('Anda tidak dapat menghapus diri sendiri.');
+    }
+
+    const { error } = await supabase
+      .from('workspace_members')
+      .delete()
+      .eq('id', memberId);
+    if (error) throw error;
+
+    await createAuditLog({
+      action: 'DELETE',
+      targetTable: 'workspace_members',
+      recordId: memberId,
+      oldData: member
+    });
+
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function createAuditLog({ action, targetTable, recordId, oldData, newData }) {
+  const user = getSession();
+  if (!user) return;
+
+  try {
+    await supabase.from('audit_logs').insert({
+      workspace_id: user.tenantId,
+      user_id: user.userId,
+      action: action,
+      target_table: targetTable,
+      record_id: recordId,
+      old_data: oldData,
+      new_data: newData
+    });
+  } catch (err) {
+    console.error('Audit log failed:', err);
+  }
+}
+
+export async function syncOfflineTransactions() {
+  if (!navigator.onLine) return { success: false, message: 'Offline' };
+  const queue = loadJSONDirect('posas_offline_transactions', []);
+  if (queue.length === 0) return { success: true, count: 0 };
+
+  let successCount = 0;
+  const remainingQueue = [];
+
+  for (const txn of queue) {
+    try {
+      const { error: txError } = await supabase.from('transactions').insert({
+        id: txn.id,
+        user_id: txn.user_id,
+        tenant_id: txn.tenant_id,
+        items: txn.items,
+        total: txn.total,
+        customer_name: txn.customer_name,
+        method: txn.method,
+        outlet_id: txn.outlet_id,
+        created_at: txn.created_at
+      });
+      if (txError) throw txError;
+
+      const c = customers.find(cu => cu.name === txn.customer_name);
+      if (c) {
+        const updates = {
+          totalSpent: c.totalSpent + txn.total,
+          visits: c.visits + 1,
+          lastVisit: new Date(txn.created_at).toISOString().slice(0, 10),
+          points: (c.points || 0) + Math.floor(txn.total / 1000)
+        };
+        Object.assign(c, updates);
+        saveJSON(KEYS.customers, customers);
+        await supabase.from('customers').update(updates).eq('id', c.id);
+      }
+
+      if (txn.cartItems) {
+        for (const ci of txn.cartItems) {
+          const p = products.find(pr => pr.id === ci.id);
+          if (p) {
+            const newStock = Math.max(0, p.stock - ci.qty);
+            p.stock = newStock;
+            await supabase.from('products').update({ stock: newStock }).eq('id', p.id);
+          }
+        }
+        saveJSON(KEYS.products, products);
+      }
+
+      successCount++;
+    } catch (err) {
+      console.error('Failed to sync transaction', txn.id, err);
+      remainingQueue.push(txn);
+    }
+  }
+
+  localStorage.setItem('posas_offline_transactions', JSON.stringify(remainingQueue));
+  return { success: remainingQueue.length === 0, count: successCount };
+}
+

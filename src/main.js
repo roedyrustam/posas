@@ -3,7 +3,7 @@ import './style.css';
 import Chart from 'chart.js/auto';
 import * as htmlToImage from 'html-to-image';
 import { createPaymentInvoice, checkPaymentStatus } from './payment.js';
-import { products, customers, cart, formatRupiah, addProduct, addCustomer, addTransaction, decreaseStock, addInvoice, updateInvoiceStatus, addBooking, updateBookingStatus, deleteProduct, deleteCustomer, register, login, logout, getSession, getCurrentUser, exportToCSV, transactions, canAccess, fetchTeam, addStaff, removeStaff, redeemPoints, upgradeToPro, bulkAddProducts, branding, updateBranding, logs, addLog, getNotifications, dismissNotification, getCustomerTier, outlets, activeOutlet, setActiveOutlet, addOutlet, updateOutlet, deleteOutlet, toggleTenantPlan } from './data.js';
+import { products, customers, cart, formatRupiah, addProduct, addCustomer, addTransaction, decreaseStock, addInvoice, updateInvoiceStatus, addBooking, updateBookingStatus, deleteProduct, deleteCustomer, register, login, logout, getSession, getCurrentUser, exportToCSV, transactions, canAccess, fetchTeam, addStaff, removeStaff, redeemPoints, upgradeToPro, bulkAddProducts, branding, updateBranding, logs, addLog, getNotifications, dismissNotification, getCustomerTier, outlets, activeOutlet, setActiveOutlet, addOutlet, updateOutlet, deleteOutlet, toggleTenantPlan, fetchWorkspaces, createWorkspace, switchWorkspace, deleteWorkspaceAccount, deleteUserAccount, syncOfflineTransactions } from './data.js';
 import {
   renderDashboard, renderPOS, renderProducts,
   renderCustomers, renderFinance, renderBooking,
@@ -596,6 +596,121 @@ function bindPageEvents(page) {
     const btnManageLocked = document.getElementById('btn-go-manage-outlets-locked');
     if (btnManageLocked) {
       btnManageLocked.addEventListener('click', () => showUpgradeModal('Kelola Semua Cabang'));
+    }
+
+    // --- WORKSPACE & PDP COMPLIANCE BINDINGS ---
+    const selWorkspace = document.getElementById('sel-active-workspace');
+    if (selWorkspace) {
+      fetchWorkspaces().then(list => {
+        const currentUser = getSession();
+        selWorkspace.innerHTML = list.map(w => `
+          <option value="${w.id}" ${currentUser.tenantId === w.id ? 'selected' : ''}>
+            ${w.name} (${w.role.toUpperCase()})
+          </option>
+        `).join('');
+      });
+
+      selWorkspace.addEventListener('change', async (e) => {
+        const id = e.target.value;
+        const res = await switchWorkspace(id);
+        if (res.success) {
+          showToast(`Workspace berhasil diubah ke ${res.user.storeName}! 🏪`);
+          navigateTo('settings');
+          applyBranding();
+        } else {
+          showToast(res.error || 'Gagal mengubah workspace.', 'error');
+        }
+      });
+    }
+
+    const btnCreateWS = document.getElementById('btn-create-workspace');
+    if (btnCreateWS) {
+      btnCreateWS.addEventListener('click', () => {
+        showModal(`
+          <div class="modal-title">Workspace / Toko Baru</div>
+          <div class="input-group">
+            <label class="input-label">Nama Toko *</label>
+            <input class="input" id="inp-ws-name" placeholder="Contoh: Toko Cabang Dua" />
+          </div>
+          <div class="input-group">
+            <label class="input-label">Slug URL (Unik) *</label>
+            <input class="input" id="inp-ws-slug" placeholder="Contoh: toko-cabang-dua" />
+          </div>
+          <div class="flex gap-12 mt-24">
+            <button class="btn btn-ghost flex-1" onclick="closeModal()">Batal</button>
+            <button class="btn btn-primary flex-1" id="btn-confirm-create-ws">Buat Workspace</button>
+          </div>
+        `);
+
+        document.getElementById('btn-confirm-create-ws').addEventListener('click', async () => {
+          const name = document.getElementById('inp-ws-name').value.trim();
+          const slug = document.getElementById('inp-ws-slug').value.trim();
+
+          if (!name || !slug) return showToast('Harap isi semua field wajib', 'error');
+
+          const res = await createWorkspace({ name, slug });
+          if (res.success) {
+            showToast('Workspace baru berhasil dibuat! 🎉');
+            closeModal();
+            await switchWorkspace(res.workspace.id);
+            navigateTo('settings');
+            applyBranding();
+          } else {
+            showToast(res.error || 'Gagal membuat workspace.', 'error');
+          }
+        });
+      });
+    }
+
+    const btnDeleteWS = document.getElementById('btn-delete-workspace');
+    if (btnDeleteWS) {
+      btnDeleteWS.addEventListener('click', async () => {
+        const currentUser = getSession();
+        const confirm = window.confirm(`Hapus workspace "${currentUser.storeName}"?\nTindakan ini permanen dan akan menghapus seluruh data produk, transaksi, dan data lainnya di toko ini!`);
+        if (confirm) {
+          const doubleConfirm = window.confirm(`Apakah Anda benar-benar yakin ingin menghapus workspace "${currentUser.storeName}"? Ketik "HAPUS" untuk konfirmasi.`);
+          const text = window.prompt(`Masukkan tulisan "HAPUS" untuk mengonfirmasi penghapusan workspace.`);
+          if (text === 'HAPUS') {
+            const res = await deleteWorkspaceAccount(currentUser.tenantId);
+            if (res.success) {
+              showToast('Workspace berhasil dihapus 🗑️');
+              const list = await fetchWorkspaces();
+              if (list.length > 0) {
+                await switchWorkspace(list[0].id);
+                navigateTo('settings');
+              } else {
+                await logout();
+                window.location.reload();
+              }
+            } else {
+              showToast(res.error || 'Gagal menghapus workspace.', 'error');
+            }
+          } else {
+            showToast('Penghapusan dibatalkan.', 'info');
+          }
+        }
+      });
+    }
+
+    const btnDeleteUser = document.getElementById('btn-delete-user-account');
+    if (btnDeleteUser) {
+      btnDeleteUser.addEventListener('click', async () => {
+        const confirm = window.confirm('UU PDP: Hapus Akun & Data Permanen?\nTindakan ini akan menghapus akun Anda beserta SELURUH workspace yang Anda miliki secara cascade dari database kami. Tindakan ini tidak dapat dibatalkan.');
+        if (confirm) {
+          const text = window.prompt('Ketik "HAPUS AKUN SAYA" untuk mengonfirmasi penghapusan akun Anda secara permanen.');
+          if (text === 'HAPUS AKUN SAYA') {
+            const res = await deleteUserAccount();
+            if (res.success) {
+              showToast('Akun Anda berhasil dihapus secara permanen. Terima kasih.');
+              setTimeout(() => window.location.reload(), 2000);
+            } else {
+              showToast(res.error || 'Gagal menghapus akun.', 'error');
+            }
+          } else {
+            showToast('Penghapusan akun dibatalkan.', 'info');
+          }
+        }
+      });
     }
   }
 
@@ -1634,6 +1749,12 @@ function renderRegisterPage() {
       <label class="input-label">Password *</label>
       <input class="input" id="auth-password" type="password" placeholder="Minimal 6 karakter" />
     </div>
+    <div class="flex items-center gap-8 mb-16" style="margin-top:12px; margin-bottom:16px;">
+      <input type="checkbox" id="auth-consent" style="cursor:pointer;" />
+      <label for="auth-consent" class="text-xs text-muted" style="cursor:pointer; line-height: 1.4;">
+        Saya menyetujui <a href="#" style="color:var(--accent-light);">Ketentuan Layanan</a> & <a href="#" style="color:var(--accent-light);">Kebijakan Privasi</a> POSAS (Kepatuhan UU PDP No. 27/2022).
+      </label>
+    </div>
     <button class="btn btn-primary btn-block" id="btn-register" style="padding:14px;margin-top:4px">
       <span class="material-icons-round" style="font-size:18px">person_add</span> Daftar Gratis
     </button>
@@ -1679,9 +1800,11 @@ function bindAuthEvents(type) {
       const storeName = $('auth-store').value.trim();
       const email = $('auth-email').value.trim();
       const password = $('auth-password').value;
+      const consent = $('auth-consent').checked;
       
       if (!name || !storeName || !email || !password) return showAuthError('Semua field wajib diisi.');
       if (password.length < 6) return showAuthError('Password minimal 6 karakter.');
+      if (!consent) return showAuthError('Anda harus menyetujui Kebijakan Privasi.');
       
       $('btn-register').disabled = true;
       $('btn-register').innerHTML = '<span class="material-icons-round spin" style="font-size:18px">sync</span> Mendaftar...';
@@ -1849,5 +1972,19 @@ async function showInvoiceModal(invId) {
     });
   }, 100);
 }
+
+// Monitor online status to trigger automatic sync of offline transactions
+window.addEventListener('online', async () => {
+  showToast('Koneksi internet kembali! Mensinkronisasikan data... 📡', 'success');
+  const res = await syncOfflineTransactions();
+  if (res.success && res.count > 0) {
+    showToast(`${res.count} transaksi offline berhasil disinkronkan ke cloud! ✅`, 'success');
+    navigateTo(window.currentPage || 'dashboard');
+  }
+});
+
+window.addEventListener('offline', () => {
+  showToast('Anda sedang offline. Transaksi baru akan disimpan secara lokal. 📥', 'warning');
+});
 
 document.addEventListener('DOMContentLoaded', init);

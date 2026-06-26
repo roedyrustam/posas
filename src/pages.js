@@ -566,6 +566,12 @@ export function renderPricing() {
         
         <div class="space-y-12 mb-24">
           <div class="flex items-center gap-8 text-sm"><span class="material-icons-round text-success" style="font-size:16px">check_circle</span> Maksimal 50 Produk</div>
+          <div class="text-xs text-muted" style="margin-left: 24px; margin-top: -8px; margin-bottom: 8px;">
+            Penggunaan: <b>${products.length} / 50</b> produk terpakai
+            <div style="width:100%; height:6px; background:rgba(255,255,255,0.1); border-radius:3px; margin-top:4px;">
+              <div style="width:${Math.min(100, (products.length / 50) * 100)}%; height:100%; background:var(--accent); border-radius:3px;"></div>
+            </div>
+          </div>
           <div class="flex items-center gap-8 text-sm"><span class="material-icons-round text-success" style="font-size:16px">check_circle</span> Kasir (POS) Dasar</div>
           <div class="flex items-center gap-8 text-sm"><span class="material-icons-round text-muted" style="font-size:16px">cancel</span> Laporan Lanjutan & VIP</div>
           <div class="flex items-center gap-8 text-sm"><span class="material-icons-round text-muted" style="font-size:16px">cancel</span> Manajemen Karyawan</div>
@@ -646,6 +652,33 @@ export function renderSettings() {
       ${!isPro ? '<p class="text-xs text-muted mt-8">Fitur multi-cabang eksklusif untuk pengguna paket Pro.</p>' : ''}
     </div>
 
+    <div class="section-title mb-8" style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px">Workspace (Multi-Tenant)</div>
+    <div class="card mb-24 p-16">
+      <div class="flex justify-between items-center mb-12">
+        <div class="flex items-center gap-8">
+          <span class="material-icons-round text-accent">lan</span>
+          <span class="fw-700">Toko / Workspace Aktif</span>
+        </div>
+      </div>
+      <div class="input-group mb-12">
+        <select class="input" id="sel-active-workspace">
+          <option value="${user.tenantId}">${branding.storeName}</option>
+        </select>
+      </div>
+      <div class="flex gap-8">
+        <button class="btn btn-outline btn-block btn-sm flex items-center justify-center gap-8" id="btn-create-workspace" style="border-radius:var(--radius-md); padding:10px">
+          <span class="material-icons-round" style="font-size:16px">add_circle</span>
+          Workspace Baru
+        </button>
+        ${user.role === 'owner' ? `
+        <button class="btn btn-danger btn-block btn-sm flex items-center justify-center gap-8" id="btn-delete-workspace" style="border-radius:var(--radius-md); padding:10px">
+          <span class="material-icons-round" style="font-size:16px">delete_forever</span>
+          Hapus Toko
+        </button>
+        ` : ''}
+      </div>
+    </div>
+
     <div class="section-title mb-8" style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px">Toko</div>
     <div class="grid-1 mb-16">
       <div class="card flex items-center gap-12 section-link" data-page="storeProfile" style="padding:14px 16px;cursor:pointer">
@@ -721,6 +754,11 @@ export function renderSettings() {
       </div>
       <span class="material-icons-round" style="color:var(--accent-light)">chevron_right</span>
     </div>
+
+    <button class="btn btn-block btn-outline mb-16" id="btn-delete-user-account" style="color:var(--danger); border-color:var(--danger); background:transparent; display: flex; align-items: center; justify-content: center; gap: 8px;">
+      <span class="material-icons-round" style="font-size:18px">delete_outline</span>
+      Hapus Akun & Data (UU PDP)
+    </button>
 
     <button class="btn btn-danger btn-block" id="btn-logout" style="margin-bottom:16px">
       <span class="material-icons-round" style="font-size:18px">logout</span>
