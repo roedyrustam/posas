@@ -236,11 +236,52 @@ export async function syncCloudData() {
       supabase.from('bookings').select('*').order('created_at', { ascending: false }),
     ]);
 
-    if (p.data) { products.length = 0; products.push(...p.data); saveJSON(KEYS.products, products); }
-    if (c.data) { customers.length = 0; customers.push(...c.data); saveJSON(KEYS.customers, customers); }
-    if (t.data) { transactions.length = 0; transactions.push(...t.data); saveJSON(KEYS.transactions, transactions); }
-    if (i.data) { invoices.length = 0; invoices.push(...i.data); saveJSON(KEYS.invoices, invoices); }
-    if (b.data) { bookings.length = 0; bookings.push(...b.data); saveJSON(KEYS.bookings, bookings); }
+    if (p.data) { 
+      products.length = 0; 
+      products.push(...p.data.map(item => ({
+        ...item,
+        outletId: item.outletId || item.outlet_id || 'o1'
+      }))); 
+      saveJSON(KEYS.products, products); 
+    }
+    if (c.data) { 
+      customers.length = 0; 
+      customers.push(...c.data); 
+      saveJSON(KEYS.customers, customers); 
+    }
+    if (t.data) { 
+      transactions.length = 0; 
+      transactions.push(...t.data.map(row => ({
+        ...row,
+        customer: row.customer_name || 'Walk-in',
+        items: Array.isArray(row.items) ? row.items : (typeof row.items === 'string' ? JSON.parse(row.items) : []),
+        date: row.created_at ? new Date(row.created_at).toISOString().slice(0, 16).replace('T', ' ') : '',
+        outletId: row.outlet_id || 'o1'
+      }))); 
+      saveJSON(KEYS.transactions, transactions); 
+    }
+    if (i.data) { 
+      invoices.length = 0; 
+      invoices.push(...i.data.map(row => ({
+        ...row,
+        number: row.invoice_number,
+        customer: row.customer_name || 'Walk-in',
+        dueDate: row.due_date,
+        createdAt: row.created_at ? row.created_at.slice(0, 10) : '',
+        outletId: row.outlet_id || 'o1'
+      }))); 
+      saveJSON(KEYS.invoices, invoices); 
+    }
+    if (b.data) { 
+      bookings.length = 0; 
+      bookings.push(...b.data.map(row => ({
+        ...row,
+        customerName: row.customer_name,
+        createdAt: row.created_at ? row.created_at.slice(0, 10) : '',
+        outletId: row.outlet_id || 'o1'
+      }))); 
+      saveJSON(KEYS.bookings, bookings); 
+    }
     
     console.log('Cloud data synced ✅');
   } catch (err) {
@@ -678,11 +719,13 @@ export function formatRupiah(n) {
 }
 
 export function getInitials(name) {
-  return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+  if (!name || typeof name !== 'string') return '??';
+  return name.trim().split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 2);
 }
 
 const COLORS = ['#6366f1','#8b5cf6','#ec4899','#f59e0b','#22c55e','#3b82f6','#ef4444','#14b8a6'];
 export function hashColor(str) {
+  if (!str || typeof str !== 'string') return '#6b7280';
   let h = 0;
   for (let i = 0; i < str.length; i++) h = str.charCodeAt(i) + ((h << 5) - h);
   return COLORS[Math.abs(h) % COLORS.length];

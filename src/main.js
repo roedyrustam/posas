@@ -12,7 +12,7 @@ import {
   renderManageOutlets, renderAdminPortal
 } from './pages.js';
 import { getWeeklyRevenue } from './data.js';
-import { checkRateLimit, incrementUsage, fetchGlobalTenants, toggleTenantPlanCloud, fetchGlobalAuditLogs } from './data.js';
+import { checkRateLimit, incrementUsage, fetchGlobalTenants, toggleTenantPlanCloud, fetchGlobalAuditLogs, hashColor, getInitials } from './data.js';
 
 let selectedPOSCustomer = null;
 
@@ -1905,10 +1905,19 @@ function showReceiptModal(txn) {
         <span class="material-icons-round" style="font-size:18px">chat</span> WhatsApp
       </button>
     </div>
-    <button class="btn btn-ghost btn-block mt-8" onclick="closeModal(); navigateTo('pos')">Selesai</button>
+    <button class="btn btn-ghost btn-block mt-8" id="btn-done-receipt">Selesai</button>
   `);
   
   setTimeout(() => {
+    // Done button event listener
+    const doneBtn = document.getElementById('btn-done-receipt');
+    if (doneBtn) {
+      doneBtn.addEventListener('click', () => {
+        closeModal();
+        navigateTo('pos');
+      });
+    }
+
     // Download logic
     document.getElementById('btn-download-receipt').addEventListener('click', async () => {
       const btn = document.getElementById('btn-download-receipt');
