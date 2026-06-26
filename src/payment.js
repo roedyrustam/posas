@@ -1,4 +1,4 @@
-// ========== POSAS Payment Service (Xendit Integration) ==========
+// ========== KasirPro Payment Service (Xendit Integration) ==========
 // This service handles integration with Xendit for QRIS, E-wallets, and VA.
 
 const XENDIT_SECRET_KEY = 'YOUR_XENDIT_SECRET_KEY_HERE'; // User should replace this
@@ -21,8 +21,8 @@ export async function createPaymentInvoice({ external_id, amount, payer_email, d
         id: 'inv_' + Math.random().toString(36).substr(2, 9),
         external_id: external_id,
         status: 'PENDING',
-        merchant_name: 'POSAS Store',
-        merchant_profile_picture_url: 'https://posas.app/logo.png',
+        merchant_name: 'KasirPro Store',
+        merchant_profile_picture_url: 'https://kasirpro.app/logo.png',
         amount: amount,
         description: description,
         expiry_date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),

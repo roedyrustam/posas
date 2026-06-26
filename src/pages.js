@@ -1,4 +1,4 @@
-// ========== POSAS Page Renderers ==========
+// ========== KasirPro Page Renderers ==========
 import { products, customers, transactions, invoices, bookings, staff, logs, getWeeklyRevenue, getStats, cart, formatRupiah, getInitials, hashColor, getCurrentUser, branding, getLowStockProducts, getTopProducts, getTopCustomers, generateSalesCSV, exportToCSV, outlets, activeOutlet, getFilteredProducts, getFilteredTransactions, getFilteredInvoices, getFilteredBookings, getAllTenantsData } from './data.js';
 
 // ===== DASHBOARD =====

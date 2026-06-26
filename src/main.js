@@ -330,6 +330,9 @@ function closeModal() {
   modalContainer.classList.add('hidden');
 }
 
+window.showModal = showModal;
+window.closeModal = closeModal;
+
 // ===== Notifications =====
 const shownNotifications = new Set(JSON.parse(sessionStorage.getItem('shown_notifications') || '[]'));
 
@@ -1707,7 +1710,7 @@ function bindPageEvents(page) {
   if (page === 'reports') {
     const exportBtn = document.getElementById('btn-export-csv');
     if (exportBtn) exportBtn.addEventListener('click', () => {
-      exportToCSV('transaksi_posas.csv', transactions);
+      exportToCSV('transaksi_kasirpro.csv', transactions);
       showToast('Data berhasil diekspor 📂');
     });
   }
@@ -1965,7 +1968,7 @@ function initCharts(page) {
 
 // ===== Receipt Modal =====
 function showReceiptModal(txn) {
-  const user = getCurrentUser() || { storeName: 'POSAS Store' };
+  const user = getCurrentUser() || { storeName: 'KasirPro Store' };
   const itemsHtml = txn.cartItems ? txn.cartItems.map(i => `
     <div class="receipt-item">
       <span>${i.name} x${i.qty}</span>
@@ -1990,9 +1993,9 @@ function showReceiptModal(txn) {
           <span>${formatRupiah(txn.total)}</span>
         </div>
         <div class="receipt-footer">
-          <div class="receipt-qr" style="background:#f3f4f6;padding:10px;border-radius:8px;margin-bottom:12px;font-weight:700;color:#374151;letter-spacing:2px;border-color:${branding.accent}33">${branding.storeEmoji} POSAS VERIFIED</div>
+          <div class="receipt-qr" style="background:#f3f4f6;padding:10px;border-radius:8px;margin-bottom:12px;font-weight:700;color:#374151;letter-spacing:2px;border-color:${branding.accent}33">${branding.storeEmoji} KASIRPRO VERIFIED</div>
           <p>${branding.receiptFooter}</p>
-          <p style="font-size:10px;color:var(--text-muted)">Disimpan secara aman oleh POSAS SaaS</p>
+          <p style="font-size:10px;color:var(--text-muted)">Disimpan secara aman oleh KasirPro SaaS</p>
         </div>
       </div>
     </div>
@@ -2061,8 +2064,8 @@ function renderLoginPage() {
   return `
   <div class="auth-logo">
     <div class="splash-icon"><span class="material-icons-round">rocket_launch</span></div>
-    <h1>POSAS</h1>
-    <p>Platform Operasi Serbaguna untuk Semua</p>
+    <h1>KasirPro</h1>
+    <p>Aplikasi Kasir SaaS Modern & Efisien</p>
   </div>
   <div class="auth-card fade-in">
     <h2>Masuk ke Akun</h2>
@@ -2091,7 +2094,7 @@ function renderRegisterPage() {
   return `
   <div class="auth-logo">
     <div class="splash-icon"><span class="material-icons-round">rocket_launch</span></div>
-    <h1>POSAS</h1>
+    <h1>KasirPro</h1>
     <p>Mulai kelola bisnis Anda sekarang</p>
   </div>
   <div class="auth-card fade-in">
@@ -2119,7 +2122,7 @@ function renderRegisterPage() {
     <div class="flex items-center gap-8 mb-16" style="margin-top:12px; margin-bottom:16px;">
       <input type="checkbox" id="auth-consent" style="cursor:pointer;" />
       <label for="auth-consent" class="text-xs text-muted" style="cursor:pointer; line-height: 1.4;">
-        Saya menyetujui <a href="#" style="color:var(--accent-light);">Ketentuan Layanan</a> & <a href="#" style="color:var(--accent-light);">Kebijakan Privasi</a> POSAS (Kepatuhan UU PDP No. 27/2022).
+        Saya menyetujui <a href="#" style="color:var(--accent-light);">Ketentuan Layanan</a> & <a href="#" style="color:var(--accent-light);">Kebijakan Privasi</a> KasirPro (Kepatuhan UU PDP No. 27/2022).
       </label>
     </div>
     <button class="btn btn-primary btn-block" id="btn-register" style="padding:14px;margin-top:4px">
