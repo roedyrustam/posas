@@ -977,16 +977,108 @@ export function renderReports() {
   const totalPajak = filteredTxns.reduce((sum, t) => sum + Number(t.tax || 0), 0);
   const totalSubtotal = filteredTxns.reduce((sum, t) => sum + Number(t.subtotal || t.total || 0), 0);
   
-  // Calculate total HPP (cost of goods sold) from raw_items
+  // Calculate total HPP (cost of goods sold) from cartItems/raw_items
   const totalHpp = filteredTxns.reduce((sum, t) => {
-    if (t.raw_items && Array.isArray(t.raw_items)) {
-      return sum + t.raw_items.reduce((s, item) => s + (Number(item.cost_price || 0) * Number(item.qty || 1)), 0);
+    const itemsArray = t.cartItems || t.raw_items;
+    if (itemsArray && Array.isArray(itemsArray)) {
+      return sum + itemsArray.reduce((s, item) => s + (Number(item.cost_price || 0) * Number(item.qty || 1)), 0);
     }
     // Fallback estimate for legacy orders
     return sum + (Number(t.total || 0) * 0.5);
   }, 0);
 
   const labaKotor = Math.max(0, totalSubtotal - totalDiskon - totalHpp);
+
+  // Calculate Margin & HPP per Product
+  const productStats = {};
+  products.forEach(p => {
+    productStats[p.name] = {
+      name: p.name,
+      sku: p.sku || '-',
+      category: p.category || 'Lainnya',
+      qty: 0,
+      revenue: 0,
+      cost: 0,
+      profit: 0
+    };
+  });
+
+  filteredTxns.forEach(t => {
+    const itemsArray = t.cartItems || t.raw_items;
+    if (itemsArray && Array.isArray(itemsArray)) {
+      itemsArray.forEach(item => {
+        if (!productStats[item.name]) {
+          productStats[item.name] = {
+            name: item.name,
+            sku: item.sku || '-',
+            category: item.category || 'Lainnya',
+            qty: 0,
+            revenue: 0,
+            cost: 0,
+            profit: 0
+          };
+        }
+        const qty = Number(item.qty || 1);
+        const price = Number(item.price || 0);
+        const cost = Number(item.cost_price || 0);
+        
+        productStats[item.name].qty += qty;
+        productStats[item.name].revenue += qty * price;
+        productStats[item.name].cost += qty * cost;
+        productStats[item.name].profit += (qty * price) - (qty * cost);
+      });
+    } else if (t.items && Array.isArray(t.items)) {
+      t.items.forEach(label => {
+        const parts = label.split(' x');
+        const name = parts[0];
+        const qty = parts[1] ? Number(parts[1]) : 1;
+        
+        const pObj = products.find(p => p.name === name);
+        const price = pObj ? pObj.price : 0;
+        const cost = pObj ? pObj.cost_price : 0;
+        
+        if (!productStats[name]) {
+          productStats[name] = {
+            name: name,
+            sku: pObj ? (pObj.sku || '-') : '-',
+            category: pObj ? (pObj.category || 'Lainnya') : 'Lainnya',
+            qty: 0,
+            revenue: 0,
+            cost: 0,
+            profit: 0
+          };
+        }
+        productStats[name].qty += qty;
+        productStats[name].revenue += qty * price;
+        productStats[name].cost += qty * cost;
+        productStats[name].profit += (qty * price) - (qty * cost);
+      });
+    }
+  });
+
+  const productList = Object.values(productStats)
+    .filter(p => p.qty > 0)
+    .sort((a, b) => b.revenue - a.revenue);
+
+  // Calculate Margin & HPP per Category
+  const categoryStats = {};
+  Object.values(productStats).forEach(p => {
+    if (p.qty === 0) return;
+    if (!categoryStats[p.category]) {
+      categoryStats[p.category] = {
+        category: p.category,
+        qty: 0,
+        revenue: 0,
+        cost: 0,
+        profit: 0
+      };
+    }
+    categoryStats[p.category].qty += p.qty;
+    categoryStats[p.category].revenue += p.revenue;
+    categoryStats[p.category].cost += p.cost;
+    categoryStats[p.category].profit += p.profit;
+  });
+  const categoryList = Object.values(categoryStats).sort((a, b) => b.revenue - a.revenue);
 
   return `
   <div class="fade-in">
@@ -1047,6 +1139,87 @@ export function renderReports() {
       <p class="text-sm opacity-80 mb-16">Dapatkan insight produk terlaris dan pelanggan VIP Anda dengan KasirPro Pro.</p>
       <button class="btn btn-white btn-sm" onclick="navigateTo('pricing')">Lihat Paket Pro</button>
     </div>` : ''}
+
+    <!-- Laba Kotor & Margin HPP Section (SaaS POS Standard) -->
+    <div class="section mb-24">
+      <div class="section-header">
+        <span class="section-title">Laporan Laba Kotor & Margin HPP</span>
+        ${isPro ? '' : '<span class="badge badge-warning">PRO</span>'}
+      </div>
+      <div class="card p-16">
+        ${isPro ? `
+          <div class="flex items-center gap-8 mb-16" style="background:var(--bg-elevated); padding:4px; border-radius:10px; width:fit-content">
+            <button class="btn btn-sm" id="btn-show-prod-margin" style="border-radius:8px; background:var(--accent); color:white" onclick="document.getElementById('report-prod-margin-tbl').style.display='block'; document.getElementById('report-cat-margin-tbl').style.display='none'; this.style.background='var(--accent)'; this.style.color='white'; document.getElementById('btn-show-cat-margin').style.background='none'; document.getElementById('btn-show-cat-margin').style.color='var(--text-secondary)'">Per Produk</button>
+            <button class="btn btn-sm" id="btn-show-cat-margin" style="border-radius:8px; background:none; color:var(--text-secondary)" onclick="document.getElementById('report-prod-margin-tbl').style.display='none'; document.getElementById('report-cat-margin-tbl').style.display='block'; this.style.background='var(--accent)'; this.style.color='white'; document.getElementById('btn-show-prod-margin').style.background='none'; document.getElementById('btn-show-prod-margin').style.color='var(--text-secondary)'">Per Kategori</button>
+          </div>
+          
+          <div id="report-prod-margin-tbl" class="table-responsive">
+            <table class="report-table">
+              <thead>
+                <tr>
+                  <th>Produk</th>
+                  <th>SKU</th>
+                  <th style="text-align:center">Terjual</th>
+                  <th style="text-align:right">Omzet</th>
+                  <th style="text-align:right">Total HPP</th>
+                  <th style="text-align:right">Laba Kotor</th>
+                  <th style="text-align:right">Margin %</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${productList.length > 0 ? productList.map(p => {
+                  const marginPct = p.revenue > 0 ? Math.round((p.profit / p.revenue) * 100) : 0;
+                  return `
+                  <tr>
+                    <td><strong>${p.name}</strong><br><span class="text-muted" style="font-size:11px">${p.category}</span></td>
+                    <td><code style="background:var(--bg-elevated); padding:2px 4px; border-radius:4px">${p.sku}</code></td>
+                    <td style="text-align:center">${p.qty}</td>
+                    <td style="text-align:right">${formatRupiah(p.revenue)}</td>
+                    <td style="text-align:right; color:var(--text-secondary)">${formatRupiah(p.cost)}</td>
+                    <td style="text-align:right; font-weight:600; color:var(--success)">${formatRupiah(p.profit)}</td>
+                    <td style="text-align:right"><span class="report-badge-profit">${marginPct}%</span></td>
+                  </tr>`;
+                }).join('') : `<tr><td colspan="7" style="text-align:center" class="text-muted">Belum ada data penjualan</td></tr>`}
+              </tbody>
+            </table>
+          </div>
+          
+          <div id="report-cat-margin-tbl" class="table-responsive" style="display:none">
+            <table class="report-table">
+              <thead>
+                <tr>
+                  <th>Kategori</th>
+                  <th style="text-align:center">Terjual</th>
+                  <th style="text-align:right">Omzet</th>
+                  <th style="text-align:right">Total HPP</th>
+                  <th style="text-align:right">Laba Kotor</th>
+                  <th style="text-align:right">Margin %</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${categoryList.length > 0 ? categoryList.map(c => {
+                  const marginPct = c.revenue > 0 ? Math.round((c.profit / c.revenue) * 100) : 0;
+                  return `
+                  <tr>
+                    <td><strong>${c.category}</strong></td>
+                    <td style="text-align:center">${c.qty}</td>
+                    <td style="text-align:right">${formatRupiah(c.revenue)}</td>
+                    <td style="text-align:right; color:var(--text-secondary)">${formatRupiah(c.cost)}</td>
+                    <td style="text-align:right; font-weight:600; color:var(--success)">${formatRupiah(c.profit)}</td>
+                    <td style="text-align:right"><span class="report-badge-profit">${marginPct}%</span></td>
+                  </tr>`;
+                }).join('') : `<tr><td colspan="6" style="text-align:center" class="text-muted">Belum ada data penjualan</td></tr>`}
+              </tbody>
+            </table>
+          </div>
+        ` : `
+          <div class="text-center py-20 opacity-40">
+            <span class="material-icons-round" style="font-size:48px">analytics</span>
+            <p class="text-sm">Analisis HPP & Margin kotor hanya tersedia untuk pengguna Pro</p>
+          </div>
+        `}
+      </div>
+    </div>
 
     <div class="grid-1 gap-24">
       <div class="section">
